@@ -18,7 +18,7 @@ export function ShopResults({ products, onClear }: { products: CatalogProduct[];
     setLimit(limit + PAGE_SIZE);
     setAnnouncement(`${count} more products loaded. Showing ${Math.min(limit + PAGE_SIZE, products.length)} of ${products.length}.`);
     requestAnimationFrame(() => {
-      document.getElementById(`shop-product-${firstNewProduct.id}`)?.querySelector("button")?.focus({ preventScroll: true });
+      document.getElementById(`shop-product-${firstNewProduct.id}`)?.querySelector("a")?.focus({ preventScroll: true });
     });
   }
 

@@ -1,9 +1,10 @@
 import type { CatalogProduct } from "@/types/store";
 import { photos } from "./photos";
+import { createDemoDetails } from "./product-details";
 
 // One shared local catalogue for homepage selections and /shop. These are demo
 // products, not stock records. Existing homepage names, prices and photos stay intact.
-export const catalogProducts: CatalogProduct[] = [
+const productEntries: Omit<CatalogProduct, "slug" | "details">[] = [
   { id: "premium-modal-rose", name: "Premium Modal Hijab", price: 650, photo: photos.rose, category: "hijabs", fabric: "modal", colour: "rose", addedAt: "2026-10-09" },
   { id: "chiffon-classics", name: "Chiffon Hijab", price: 490, photo: photos.folded, category: "hijabs", fabric: "chiffon", colour: "multi", addedAt: "2026-10-08" },
   { id: "jersey-olive", name: "Jersey Hijab", price: 750, photo: photos.olive, category: "hijabs", fabric: "jersey", colour: "olive", addedAt: "2026-10-07" },
@@ -33,6 +34,16 @@ export const catalogProducts: CatalogProduct[] = [
   { id: "gold-hijab-pins", name: "Gold Hijab Pins", price: 180, photo: photos.accessories, category: "accessories", fabric: null, colour: "gold", addedAt: "2026-10-05" },
   { id: "accessory-set", name: "Everyday Accessories Set", price: 450, photo: photos.accessories, category: "accessories", fabric: null, colour: "multi", addedAt: "2026-10-04" },
 ];
+
+export const catalogProducts: CatalogProduct[] = productEntries.map((product) => ({
+  ...product,
+  slug: product.id,
+  details: createDemoDetails(product),
+}));
+
+export function findProductBySlug(slug: string): CatalogProduct | undefined {
+  return catalogProducts.find((product) => product.slug === slug);
+}
 
 export function selectProducts(ids: readonly string[]): CatalogProduct[] {
   return ids.map((id) => {

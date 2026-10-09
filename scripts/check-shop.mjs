@@ -167,8 +167,8 @@ try {
   await expect(page.getByRole("searchbox", { name: "Search products" })).toHaveValue("modal olive");
   await count(page, 1);
   await page.locator(".shop-product-grid .product-link").first().click();
-  await expect(page.locator(".coming-soon-notice")).toContainText("Coming soon");
-  assert.equal(new URL(page.url()).pathname, "/shop");
+  await expect(page).toHaveURL(/\/products\/popular-olive$/);
+  await expect(page.getByRole("heading", { name: "Olive Modal Hijab", level: 1 })).toBeVisible();
 
   await page.goto(`${baseURL}/shop?fabric=unknown&colour=invalid&price=bad&sort=bad`, { waitUntil: "networkidle" });
   await count(page, 28);
@@ -187,7 +187,7 @@ try {
   await count(page, 1);
   assert.deepEqual(await ids(page), ["burgundy-modal"]);
   await context.close();
-  console.log("PASS combined filters, live search, sorting, pagination, URL history, all category links and product feedback");
+  console.log("PASS combined filters, live search, sorting, pagination, URL history, all category links and product navigation");
 
   // A missing product image gets a simple styled placeholder, never a broken icon.
   const fallbackContext = await browser.newContext();

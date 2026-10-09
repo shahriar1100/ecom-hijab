@@ -1,6 +1,6 @@
 # NOOR — storefront preview
 
-A responsive hijab boutique homepage and shop with light and dark themes, built with Next.js App Router, TypeScript and Tailwind CSS. Routes are `/` and `/shop`. There are no commerce services, product-detail pages, API routes, authentication, payments or deployment configuration.
+A responsive hijab boutique homepage, shop and product details with light and dark themes, built with Next.js App Router, TypeScript and Tailwind CSS. Routes are `/`, `/shop` and `/products/[slug]`. There are no commerce services, cart, checkout, API routes, authentication, payments or deployment configuration.
 
 ## Run locally
 
@@ -28,19 +28,23 @@ See [verification results and known demo limitations](docs/verification.md).
 
 `npm run check:shop` checks the shop in both themes at 320, 360, 390, 768, 834, 1024 and 1440px. It covers responsive grids, sidebar/drawer behaviour, focus containment and restoration, Apply/Clear, combined filters, sorting, search, pagination, query links and browser history, image loading/fallback and axe accessibility. Its reports and screenshots are saved to the ignored `output/shop-qa/` folder.
 
-`npm run check:navigation` checks both pages in both themes at 320, 390, 768, 834, 1024 and 1440px. It covers the responsive header, bottom navigation and active links, menu/category routing, keyboard focus, dismissal, background scroll locking, reduced motion, theme persistence, Coming soon feedback and a short landscape viewport. Screenshots and reports are saved to the ignored `output/navigation-qa/` folder.
+`npm run check:navigation` checks the homepage and shop in both themes at 320, 390, 768, 834, 1024 and 1440px. It covers the responsive header, bottom navigation and active links, menu/category routing, keyboard focus, dismissal, background scroll locking, reduced motion, theme persistence, Coming soon feedback and a short landscape viewport. Screenshots and reports are saved to the ignored `output/navigation-qa/` folder.
+
+`npm run check:products` checks product details in both themes at 320, 360, 390, 768, 834, 1024 and 1440px. It covers gallery controls, image loading/fallback, colour selection, stock/quantity limits, keyboard access, cart-preview feedback, all 28 product routes, homepage links, shared navigation and invalid slugs. Screenshots and reports are saved to the ignored `output/product-qa/` folder.
 
 ## Editing the storefront
 
-- `src/data/catalog.ts`: the shared typed catalogue of 28 demo products, BDT prices, fabric/category/colour and dates used for sorting. Homepage selections use this same catalogue while preserving their approved names, prices, images and order.
+- `src/data/catalog.ts`: the shared typed catalogue of 28 demo products, stable slugs, BDT prices, fabric/category/colour and dates used for sorting. Homepage selections use this same catalogue while preserving their approved names, prices, images and order.
+- `src/data/product-details.ts`: local demo descriptions, dimensions, materials, colour variants, stock and galleries assembled from existing photo references. These are sample product details, not live inventory.
 - `src/data/photos.ts`: every photo URL, alt description and crop position, ready to be replaced with future uploaded assets.
 - `src/data/store.ts`: homepage product selections, stories, category links, navigation, demo contacts and the static sale timer.
 - `src/data/shop-options.ts` and `src/lib/shop.ts`: typed filter choices, URL parsing, filtering and sorting.
 - `src/types/store.ts`: shared data types.
-- `src/components/home/`: homepage sections; `product/`: reusable product card; `layout/`: shared header, menu drawer, footer and bottom navigation.
+- `src/components/home/`: homepage sections; `product/`: reusable product card, photo fallback, gallery and local product controls; `layout/`: shared header, menu drawer, footer and bottom navigation.
 - `src/components/shop/`: interactive catalogue, shared filter fields and Load More. The page title and shared frame remain Server Components. A small product-photo component provides a simple styled placeholder if an image fails.
 - `src/app/globals.css`: brand tokens, layout and responsive styling. The main breakpoints are 768px (tablet), 1024px (desktop), and 1200px (expanded desktop search).
 - `src/app/shop/shop.css`: scoped shop styles; desktop filters start at 1024px, and the catalogue uses 2/3/4 columns at mobile/tablet/desktop widths.
+- `src/app/products/[slug]/`: product page, metadata, scoped styles and a friendly missing-product state. Static names, prices, descriptions, specifications and delivery notes are rendered by the Server Component; gallery, colour and quantity selections are Client Components.
 - `public/images/`: existing local WebP assets. Replace these files or update `photos.ts`. No new pictures were created for the shop. A future remote image host also needs an explicit `images.remotePatterns` entry in `next.config.ts`.
 
 The placeholders were generated specifically for this mockup using the built-in image-generation tool. No screenshots or screenshot fragments are used as page content. See [demo image provenance and prompts](docs/demo-images.md).
@@ -51,7 +55,9 @@ For future changes, use supplied or existing images only. Do not generate new im
 
 ## Preview behaviour
 
-The homepage hero CTA and section links still scroll to their original sections. Header Shop and homepage category links now open `/shop`; category links preselect their corresponding fabric or Accessories. Product, story, saved, account, bag, social and other unfinished controls keep their Coming soon feedback. No product links lead to unbuilt pages. The bag count of 3, contact details and static sale timer remain demo content.
+The homepage hero CTA and section links still scroll to their original sections. Header Shop and homepage category links open `/shop`; category links preselect their corresponding fabric or Accessories. Product cards and circular Top Products link to `/products/[slug]`. Story, saved, account, header/bottom bag, social and other unfinished controls keep their Coming soon feedback. The bag count of 3, contact details and static sale timer remain demo content.
+
+Product details reuse the same product names, BDT prices and primary photos as the cards. Example: `/products/premium-modal-rose`. The 28 known product paths are prerendered with [generateStaticParams](https://nextjs.org/docs/app/api-reference/functions/generate-static-params); unknown slugs return a 404 with a Back to Shop link. Gallery arrows and thumbnails work locally. Selecting a colour changes the gallery and demo stock; quantity stays between 1 and available stock, clamps when switching to a lower-stock colour, and is disabled when out of stock. Selection resets on a fresh page load. Add to Bag only announces “Cart feature coming next”; it does not change the badge, store a cart or send an order. Dimensions and availability are visibly identified as demo data, and delivery timing/charges are left unconfirmed. No images were generated for this phase: galleries reference the existing URLs in the data layer, with the shared placeholder on image failure.
 
 The shop searches names, fabrics, colours and categories as you type. Options within a filter group are ORed; separate groups and the search are ANDed. Price bands use the displayed current price (including demo discounts). Sort options are featured order, newest, price ascending/descending, and name. Load More adds 12 products; changing search, filters or sort starts again with 12. The empty state clears all filters and search. Mobile/tablet drawer selections are drafts until Apply; Clear resets the draft, and Escape/close discards it. The desktop sidebar applies changes immediately.
 

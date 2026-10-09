@@ -2,6 +2,25 @@
 
 Verified locally on 2026-10-09 with Node.js 22.17, Next.js 16.4, and headless Google Chrome.
 
+## Product details phase
+
+The new route is `/products/[slug]`, using the existing 28-product catalogue. Names, prices and primary photos remain shared with homepage/shop cards. No new images, dependencies or commerce services were added. Size, variants and stock are typed local demo values; the page identifies them as such.
+
+| Check | Result |
+| --- | --- |
+| ESLint / TypeScript / production build | Passed; all 28 known product paths are prerendered |
+| Responsive layouts | Stacked on mobile, two columns on tablet/desktop; no overflow at 320, 360, 390, 768, 834, 1024 or 1440px, in either theme |
+| Gallery | Existing photos load; arrows, thumbnails and colour-dependent galleries work; missing-image simulation shows the shared placeholder |
+| Colour / quantity | Native radio keyboard navigation works; quantity stays within stock, clamps on lower-stock selections, and disables with Add to Bag when out of stock |
+| Add to Bag | Announces “Cart feature coming next”; demo bag count remains 3 |
+| Routing | All 28 detail URLs return 200 and matching product names/prices; each homepage product section and circular Top Products open valid details |
+| Invalid slug | Returns 404 with a working Back to Shop link |
+| Shared frame | Existing menu, theme toggle, footer and bottom navigation work on product pages; footer clears bottom navigation by over 20px |
+| Accessibility | No axe WCAG 2 A/AA or 2.1 AA violations at 390, 834 or 1440px in either theme, including the out-of-stock state |
+| Visual review | Mobile, tablet and desktop captures inspected in light/dark themes |
+
+Run `npm run check:products` against the local server. Reports and screenshots are in ignored `output/product-qa/`. Full-page screenshots show fixed navigation at the original viewport edge; scroll measurements confirm content remains reachable. Browser checks found no unexpected console or runtime errors. The homepage and shop regression suites also passed after updating product links.
+
 ## Navigation update
 
 `npm run check:navigation` passed on `/` and `/shop` in light and dark themes at 320, 390, 768, 834, 1024 and 1440px (24 combinations), with no unexpected console or runtime errors.
@@ -30,12 +49,12 @@ The new route is `/shop`; the homepage's design, photos, section order and produ
 | Search / sort | Fast typing, editing within text, empty-state clearing, header search and all five sort choices passed |
 | Load More | 12 → 24 → 28 distinct products, correct completion and reset on filter/sort changes |
 | Navigation | All five homepage category links, Shop link, URL reload and Back/Forward passed |
-| Images / product controls | Local images load; simulated missing images show the styled fallback; product controls show Coming soon |
+| Images / product controls | Local images load; simulated missing images show the styled fallback; product cards now open their detail routes |
 | Automated accessibility | No axe WCAG 2 A/AA or 2.1 AA violations at 390, 834 or 1440px in either theme, in the drawer or in the empty state |
 | Visual review | Mobile, tablet, desktop and drawer captures inspected in light/dark themes; footer remains clear of mobile navigation |
 | Homepage regression | Existing `check:ui` suite passed at all eight widths in both themes after the shared component changes |
 
-Run `npm run check:shop` against a running local server (`PREVIEW_URL` selects a different URL). Shop screenshots and reports are in the ignored `output/shop-qa/` folder. Full-page captures show fixed navigation at the original viewport edge; maximum-scroll measurements verify footer clearance. These are local demo interactions, with no backend, cart, checkout, authentication or product-detail routes.
+Run `npm run check:shop` against a running local server (`PREVIEW_URL` selects a different URL). Shop screenshots and reports are in the ignored `output/shop-qa/` folder. Full-page captures show fixed navigation at the original viewport edge; maximum-scroll measurements verify footer clearance. These are local demo interactions, with no backend, cart, checkout or authentication.
 
 ## Homepage and theme checks
 

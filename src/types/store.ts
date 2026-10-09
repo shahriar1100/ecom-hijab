@@ -6,6 +6,7 @@ export type Photo = {
 
 export type Product = {
   id: string;
+  slug: string;
   name: string;
   price: number;
   originalPrice?: number;
@@ -16,11 +17,26 @@ export type Fabric = "modal" | "chiffon" | "jersey" | "silk";
 export type ProductCategory = "hijabs" | "accessories";
 export type ProductColour = "rose" | "olive" | "black" | "sand" | "mocha" | "mauve" | "burgundy" | "multi" | "gold";
 
+export type ProductVariant = {
+  colour: ProductColour;
+  stock: number;
+  gallery: [Photo, ...Photo[]];
+};
+
+export type ProductDetails = {
+  description: string;
+  material: string;
+  size: string;
+  deliveryNote: string;
+  variants: [ProductVariant, ...ProductVariant[]];
+};
+
 export type CatalogProduct = Product & {
   category: ProductCategory;
   fabric: Fabric | null;
   colour: ProductColour;
   addedAt: string;
+  details: ProductDetails;
 };
 
 export type Story = {
