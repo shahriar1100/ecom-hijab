@@ -2,6 +2,20 @@
 
 Verified locally on 2026-10-09 with Node.js 22.17, Next.js 16.4, and headless Google Chrome.
 
+## Navigation update
+
+`npm run check:navigation` passed on `/` and `/shop` in light and dark themes at 320, 390, 768, 834, 1024 and 1440px (24 combinations), with no unexpected console or runtime errors.
+
+- Mobile/tablet header contains the logo, Search and Menu; desktop navigation, theme switch and cart remain visible only at their existing desktop breakpoints.
+- Bottom navigation is Home, Shop, Saved, Bag and Account, with the active route marked and Bag's quantity retained. Footer clearance exceeds 20px at maximum scroll; bottom and horizontal safe-area padding is included.
+- Home, Shop All and all five category links navigate correctly and close the menu. All unbuilt destinations announce Coming soon inside the drawer.
+- Initial focus, Tab/Shift+Tab wrapping, keyboard category expansion, Escape, backdrop, Close and focus restoration passed. Background wheel scrolling is blocked while open and unlocked after closing.
+- Theme switching by keyboard and pointer, saved preference after reload and desktop/menu state consistency passed. Reduced-motion mode disables the slide animation.
+- A short 834×390 landscape viewport can scroll the expanded menu while keeping Close and the theme control reachable. Resizing to desktop closes the drawer and restores focus to the logo.
+- Axe found no WCAG 2 A/AA or 2.1 AA violations in expanded drawers with Coming soon feedback at 390 and 834px, in both themes. Light/dark drawer, mobile header/bottom navigation and desktop captures were visually reviewed.
+
+The existing homepage and shop browser suites also passed after this update, along with ESLint, TypeScript and the production build. Screenshots and reports are in the ignored `output/navigation-qa/` folder. Existing pages, product data and image files were preserved; no routes or backend features were added.
+
 ## Shop phase
 
 The new route is `/shop`; the homepage's design, photos, section order and product selections are preserved. No new images or dependencies were added. The catalogue has 28 typed local demo products, shared with homepage selections, and all image URLs remain in the data layer. The complete shop browser suite passed against the production build on local port 3100, with no unexpected console or runtime errors.
@@ -39,7 +53,7 @@ Run `npm run check:shop` against a running local server (`PREVIEW_URL` selects a
 | Flash Sale | 3 mobile/tablet, 6 desktop columns |
 | Footer | Visible on every tested screen size; two-column mobile, four-column tablet and five-column desktop layouts |
 | Bottom navigation | Hidden on desktop; more than 26px clearance below the footer content on mobile/tablet at maximum scroll |
-| Dark mode | Header toggle works in both themes; preference persists after reload, follows system changes before manual selection, and synchronizes across tabs |
+| Dark mode | Desktop header and mobile/tablet menu controls share the same theme preference; it persists after reload, follows system changes before manual selection, and synchronizes across tabs |
 | Theme resilience | Keyboard toggling and blocked-storage behaviour passed; no hydration or runtime errors |
 | Interactions | CTA scroll, Coming soon feedback, dismissal, search input and feedback, Escape and search focus restoration passed |
 | Automated accessibility | No axe WCAG 2 A/AA or 2.1 AA violations in either theme at 390, 834, or 1440px; mobile search dialog also checked in both themes |

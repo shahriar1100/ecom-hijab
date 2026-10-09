@@ -43,7 +43,7 @@ function subscribe(onChange: () => void) {
 const getSnapshot = () => document.documentElement.dataset.theme === "dark";
 const getServerSnapshot = () => false;
 
-export function ThemeToggle() {
+export function ThemeToggle({ variant = "icon" }: { variant?: "icon" | "menu" }) {
   const isDark = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   function toggleTheme() {
@@ -56,9 +56,10 @@ export function ThemeToggle() {
   }
 
   return (
-    <button type="button" className="icon-button theme-toggle" onClick={toggleTheme} aria-label="Dark mode" aria-pressed={isDark} title={isDark ? "Switch to light mode" : "Switch to dark mode"}>
+    <button type="button" className={`${variant === "menu" ? "menu-theme-toggle" : "icon-button"} theme-toggle`} onClick={toggleTheme} aria-label="Dark mode" aria-pressed={isDark} title={isDark ? "Switch to light mode" : "Switch to dark mode"}>
       <Moon className="theme-moon" aria-hidden="true" />
       <Sun className="theme-sun" aria-hidden="true" />
+      {variant === "menu" && <><span>Dark mode</span><span className="theme-switch-track" aria-hidden="true"><span /></span></>}
     </button>
   );
 }

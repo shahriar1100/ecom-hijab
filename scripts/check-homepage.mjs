@@ -23,7 +23,7 @@ try {
     await page.goto(baseURL, { waitUntil: "networkidle" });
     await page.getByRole("heading", { level: 1, name: "Everyday Elegance" }).waitFor();
     await expect(page.locator("html")).toHaveAttribute("data-theme", colorScheme);
-    await expect(page.getByRole("button", { name: "Dark mode", exact: true })).toHaveAttribute("aria-pressed", String(colorScheme === "dark"));
+    await expect(page.locator(".header-theme-control .theme-toggle")).toHaveAttribute("aria-pressed", String(colorScheme === "dark"));
 
     // Walk the page so the real lazy-loaded photographs are included in screenshots.
     await page.evaluate(async () => {

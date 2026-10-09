@@ -28,6 +28,8 @@ See [verification results and known demo limitations](docs/verification.md).
 
 `npm run check:shop` checks the shop in both themes at 320, 360, 390, 768, 834, 1024 and 1440px. It covers responsive grids, sidebar/drawer behaviour, focus containment and restoration, Apply/Clear, combined filters, sorting, search, pagination, query links and browser history, image loading/fallback and axe accessibility. Its reports and screenshots are saved to the ignored `output/shop-qa/` folder.
 
+`npm run check:navigation` checks both pages in both themes at 320, 390, 768, 834, 1024 and 1440px. It covers the responsive header, bottom navigation and active links, menu/category routing, keyboard focus, dismissal, background scroll locking, reduced motion, theme persistence, Coming soon feedback and a short landscape viewport. Screenshots and reports are saved to the ignored `output/navigation-qa/` folder.
+
 ## Editing the storefront
 
 - `src/data/catalog.ts`: the shared typed catalogue of 28 demo products, BDT prices, fabric/category/colour and dates used for sorting. Homepage selections use this same catalogue while preserving their approved names, prices, images and order.
@@ -35,7 +37,7 @@ See [verification results and known demo limitations](docs/verification.md).
 - `src/data/store.ts`: homepage product selections, stories, category links, navigation, demo contacts and the static sale timer.
 - `src/data/shop-options.ts` and `src/lib/shop.ts`: typed filter choices, URL parsing, filtering and sorting.
 - `src/types/store.ts`: shared data types.
-- `src/components/home/`: homepage sections; `product/`: reusable product card; `layout/`: header, footer and bottom navigation.
+- `src/components/home/`: homepage sections; `product/`: reusable product card; `layout/`: shared header, menu drawer, footer and bottom navigation.
 - `src/components/shop/`: interactive catalogue, shared filter fields and Load More. The page title and shared frame remain Server Components. A small product-photo component provides a simple styled placeholder if an image fails.
 - `src/app/globals.css`: brand tokens, layout and responsive styling. The main breakpoints are 768px (tablet), 1024px (desktop), and 1200px (expanded desktop search).
 - `src/app/shop/shop.css`: scoped shop styles; desktop filters start at 1024px, and the catalogue uses 2/3/4 columns at mobile/tablet/desktop widths.
@@ -57,7 +59,9 @@ Shop state is shareable through query parameters: `q`, comma-separated `fabric`,
 
 Stories directly follow the hero. Categories stay in a single compact circular row. New Items and Most Popular scroll horizontally on mobile, then show three tablet cards and four desktop cards. Flash Sale uses three columns on mobile/tablet and six on desktop. Just For You uses 2/3/4 columns; its curated preview contains four cards on mobile/desktop and six on tablet, following the supplied designs. The footer is visible on every device. Mobile/tablet also retain fixed navigation, with safe-area padding below the footer to keep its content accessible.
 
-The header's moon/sun button toggles dark mode. On the first visit, the page follows the device's colour preference; a manual choice is saved in `localStorage` under `noor-theme` and synchronized between tabs. A small head script applies the theme before the first paint. With storage blocked, the toggle still works for the current visit. Theme colours are CSS variables in `globals.css`; existing photographs retain their natural colours.
+Below 1024px, the header shows the NOOR logo, Search and Menu. The bottom navigation is Home, Shop, Saved, Bag and Account; Home/Shop highlight the current page and Bag retains its demo quantity. The menu opens from the right with Home, Shop All, expandable categories, My Orders, About Us, Contact Us, Delivery & Returns, Help / FAQ and the existing theme toggle. Category destinations reuse the homepage's filter URLs. Unbuilt pages give live Coming soon feedback inside the drawer. Close, backdrop, Escape and client navigation dismiss the drawer; keyboard focus is contained and restored to Menu on dismissal. The background is locked, long menu content scrolls, safe-area padding is retained and reduced-motion users get no slide animation. Resizing to desktop closes the drawer and moves focus to the logo, since Menu is then hidden. The desktop header, theme control and cart remain unchanged; the bottom navigation stays hidden there.
+
+The desktop header's moon/sun button and the mobile/tablet menu's Dark mode switch use the same theme control. On the first visit, the page follows the device's colour preference; a manual choice is saved in `localStorage` under `noor-theme` and synchronized between tabs. A small head script applies the theme before the first paint. With storage blocked, the toggle still works for the current visit. Theme colours are CSS variables in `globals.css`; existing photographs retain their natural colours.
 
 Static page and section content are Server Components. Client components handle interactive buttons, feedback, search, the catalogue and drawer, photo failure fallback, and theme selection. The native [modal dialog](https://developer.mozilla.org/en-US/docs/Web/API/HTMLDialogElement/showModal) makes background content inert; drawer keyboard handling wraps focus and restores it on close. The theme toggle uses React's [useSyncExternalStore](https://react.dev/reference/react/useSyncExternalStore), with the initial theme following [prefers-color-scheme](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/At-rules/@media/prefers-color-scheme). System fonts avoid external font requests.
 
