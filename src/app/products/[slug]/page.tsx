@@ -31,7 +31,7 @@ export default async function ProductPage({ params }: Props) {
     <SiteHeader activePage="shop" />
     <main id="main-content" className="page-container product-page">
       <nav className="product-breadcrumb" aria-label="Breadcrumb"><Link href="/">Home</Link><ChevronRight aria-hidden="true" /><Link href="/shop">Shop</Link><ChevronRight aria-hidden="true" /><span aria-current="page">{product.name}</span></nav>
-      <ProductDetails key={product.id} name={product.name} variants={product.details.variants}
+      <ProductDetails key={product.id} productId={product.id} name={product.name} variants={product.details.variants}
         summary={<div className="product-summary"><p className="product-eyebrow">NOOR · EVERYDAY ELEGANCE</p><h1>{product.name}</h1><div className="product-detail-prices"><span className="product-detail-price">{formatPrice(product.price)}</span>{product.originalPrice && <del><span className="sr-only">Original price </span>{formatPrice(product.originalPrice)}</del>}{discount > 0 && <span className="product-saving">Save {discount}%</span>}<span className="product-currency">BDT</span></div><p className="product-description">{product.details.description}</p></div>}
         specifications={<dl className="product-specifications"><div><dt>{product.fabric ? "Fabric" : "Material"}</dt><dd>{product.details.material}</dd></div><div><dt>Size</dt><dd>{product.details.size}</dd></div></dl>}
         delivery={<div className="product-delivery"><Truck size={22} aria-hidden="true" /><div><h2>Delivery</h2><p>{product.details.deliveryNote}</p></div></div>}

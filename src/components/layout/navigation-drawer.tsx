@@ -9,7 +9,7 @@ import type { Category } from "@/types/store";
 const upcomingPages = ["My Orders", "About Us", "Contact Us", "Delivery & Returns", "Help / FAQ"];
 
 export function NavigationDrawer({ activePage, categories }: {
-  activePage: "home" | "shop";
+  activePage: "home" | "shop" | "saved";
   categories: Pick<Category, "id" | "name" | "href">[];
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
@@ -61,6 +61,7 @@ export function NavigationDrawer({ activePage, categories }: {
           <ul className="menu-primary-links">
             <li><Link href="/#home" className="menu-link" aria-current={activePage === "home" ? "page" : undefined} onNavigate={close}>Home<ChevronRight aria-hidden="true" /></Link></li>
             <li><Link href="/shop" className="menu-link" aria-current={activePage === "shop" ? "page" : undefined} onNavigate={close}>Shop All<ChevronRight aria-hidden="true" /></Link></li>
+            <li><Link href="/saved" className="menu-link" aria-current={activePage === "saved" ? "page" : undefined} onNavigate={close}>Saved products<ChevronRight aria-hidden="true" /></Link></li>
             <li><button type="button" className="menu-link menu-category-toggle" aria-expanded={categoriesOpen} aria-controls="menu-category-links" onClick={() => setCategoriesOpen(!categoriesOpen)}>Categories<ChevronDown aria-hidden="true" /></button>
               <ul id="menu-category-links" className="menu-category-links" hidden={!categoriesOpen}>{categories.map((category) => <li key={category.id}><Link href={category.href} onNavigate={close}>{category.name}<ChevronRight aria-hidden="true" /></Link></li>)}</ul>
             </li>

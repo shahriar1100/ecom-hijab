@@ -1,0 +1,17 @@
+"use client";
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { ArrowLeft, Minus, Plus, Trash2, X } from "lucide-react";
+import { catalogProducts } from "@/data/catalog";
+import { formatPrice } from "@/data/store";
+import { setCartQuantity, useCartProducts } from "@/lib/cart-products";
+
+export function CartDrawer() {
+  const [open, setOpen] = useState(false); const close = () => setOpen(false); const closeRef = useRef<HTMLButtonElement>(null);
+  const { items } = useCartProducts(); const rows = items.flatMap((item) => { const product = catalogProducts.find(({ id }) => id === item.id); return product ? [{ product, quantity: item.quantity }] : []; });
+  const subtotal = rows.reduce((sum, row) => sum + row.product.price * row.quantity, 0);
+  useEffect(() => { const show = () => setOpen(true); window.addEventListener("noor:open-cart", show); return () => window.removeEventListener("noor:open-cart", show); }, []);
+  useEffect(() => { if (!open) return; const key = (event: KeyboardEvent) => { if (event.key === "Escape") close(); }; document.body.style.overflow = "hidden"; window.addEventListener("keydown", key); closeRef.current?.focus(); return () => { document.body.style.overflow = ""; window.removeEventListener("keydown", key); }; }, [open]);
+  if (!open) return null;
+  return <div className="cart-drawer-layer" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}><aside className="cart-drawer" role="dialog" aria-modal="true" aria-labelledby="cart-drawer-title"><header className="cart-drawer-header"><button ref={closeRef} type="button" className="icon-button" onClick={close} aria-label="Close shopping bag"><ArrowLeft /></button><div><h2 id="cart-drawer-title">Your Shopping Bag</h2><p>{items.reduce((sum, item) => sum + item.quantity, 0)} items</p></div><button type="button" className="icon-button" onClick={close} aria-label="Close"><X /></button></header><div className="cart-drawer-list">{rows.length ? rows.map(({ product, quantity }) => <article className="drawer-cart-item" key={product.id}><img src={product.photo.src} alt={product.photo.alt} /><div><h3>{product.name}</h3><p>{formatPrice(product.price)}</p><div className="drawer-quantity"><button type="button" onClick={() => setCartQuantity(product.id, quantity - 1)} disabled={quantity <= 1} aria-label={`Decrease ${product.name} quantity`}><Minus /></button><output>{quantity}</output><button type="button" onClick={() => setCartQuantity(product.id, quantity + 1)} aria-label={`Increase ${product.name} quantity`}><Plus /></button></div></div><div className="drawer-line-total"><strong>{formatPrice(product.price * quantity)}</strong><button type="button" onClick={() => setCartQuantity(product.id, 0)} aria-label={`Remove ${product.name}`}><Trash2 /></button></div></article>) : <div className="drawer-empty"><h3>Your shopping bag is empty</h3><p>Discover something beautiful for your collection.</p><Link href="/shop" onClick={close}>Explore Collection</Link></div>}</div>{rows.length > 0 && <footer className="cart-drawer-summary"><div><span>Subtotal</span><strong>{formatPrice(subtotal)}</strong></div><p>Shipping calculated at checkout.</p><Link href="/cart" className="drawer-checkout" onClick={close}>Proceed to Checkout</Link><button type="button" className="drawer-continue" onClick={close}>Continue Shopping</button></footer>}</aside></div>;
+}

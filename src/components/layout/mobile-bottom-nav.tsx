@@ -1,21 +1,15 @@
-import { Heart, House, Store, ShoppingBag, UserRound } from "lucide-react";
+import { House, Store, UserRound } from "lucide-react";
 import { ComingSoonButton } from "@/components/ui/coming-soon";
 import Link from "next/link";
+import { SavedLink } from "./saved-link";
+import { CartLink } from "./cart-link";
 
-const items = [
-  { label: "Saved", feature: "Saved favourites", icon: Heart },
-  { label: "Bag", feature: "Shopping bag", icon: ShoppingBag },
-  { label: "Account", feature: "Your account", icon: UserRound },
-];
-
-export function MobileBottomNav({ activePage = "home" }: { activePage?: "home" | "shop" }) {
-  return (
-    <nav className="mobile-bottom-nav" aria-label="Mobile navigation">
-      <div className="bottom-nav-inner">
-        <Link href="/#home" aria-current={activePage === "home" ? "page" : undefined} className={`bottom-nav-item ${activePage === "home" ? "selected" : ""}`}><House fill={activePage === "home" ? "currentColor" : "none"} /><span>Home</span></Link>
-        <Link href="/shop" aria-current={activePage === "shop" ? "page" : undefined} className={`bottom-nav-item ${activePage === "shop" ? "selected" : ""}`}><Store /><span>Shop</span></Link>
-        {items.map(({ label, feature, icon: Icon }) => <ComingSoonButton key={label} feature={feature} className="bottom-nav-item" aria-label={`${label}${label === "Bag" ? ", 3 items (demo)" : ""} — Coming soon`}><span className="relative"><Icon />{label === "Bag" && <span aria-hidden="true" className="bag-badge">3</span>}</span><span>{label}</span></ComingSoonButton>)}
-      </div>
-    </nav>
-  );
+export function MobileBottomNav({ activePage = "home" }: { activePage?: "home" | "shop" | "saved" | "cart" }) {
+  return <nav className="mobile-bottom-nav" aria-label="Mobile navigation"><div className="bottom-nav-inner">
+    <Link href="/#home" aria-current={activePage === "home" ? "page" : undefined} className={`bottom-nav-item ${activePage === "home" ? "selected" : ""}`}><House fill={activePage === "home" ? "currentColor" : "none"} /><span>Home</span></Link>
+    <Link href="/shop" aria-current={activePage === "shop" ? "page" : undefined} className={`bottom-nav-item ${activePage === "shop" ? "selected" : ""}`}><Store /><span>Shop</span></Link>
+    <SavedLink variant="bottom" active={activePage === "saved"} />
+    <CartLink variant="bottom" />
+    <ComingSoonButton feature="Your account" className="bottom-nav-item" aria-label="Account — Coming soon"><span className="relative"><UserRound /></span><span>Account</span></ComingSoonButton>
+  </div></nav>;
 }

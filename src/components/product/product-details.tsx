@@ -5,8 +5,10 @@ import { Minus, Plus, ShoppingBag } from "lucide-react";
 import type { ProductVariant } from "@/types/store";
 import { colourOptions } from "@/data/shop-options";
 import { ProductGallery } from "./product-gallery";
+import { SaveProductButton } from "./save-product-button";
 
-export function ProductDetails({ name, variants, summary, specifications, delivery }: {
+export function ProductDetails({ productId, name, variants, summary, specifications, delivery }: {
+  productId: string;
   name: string;
   variants: [ProductVariant, ...ProductVariant[]];
   summary: ReactNode;
@@ -35,6 +37,7 @@ export function ProductDetails({ name, variants, summary, specifications, delive
     <ProductGallery key={variant.colour} photos={variant.gallery} name={name} />
     <div className="product-information">
       {summary}
+      <div className="product-save-action"><SaveProductButton productId={productId} name={name} variant="label" /></div>
       <fieldset className="product-colours"><legend>Colour <span>{colourName}</span></legend><div className="product-colour-options">{variants.map((option) => {
         const colour = colourOptions.find(({ value }) => value === option.colour);
         return <label className="product-colour-option" key={option.colour}><input type="radio" name="product-colour" value={option.colour} checked={variant.colour === option.colour} onChange={() => selectVariant(option)} /><span className="product-colour-dot" style={{ background: colour?.swatch }} aria-hidden="true" /><span>{colour?.label}</span></label>;

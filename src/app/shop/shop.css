@@ -44,6 +44,7 @@
 .shop-product-grid .original-price { font-size: 11px; }
 .shop-product-grid .product-prices { gap: 7px; }
 .shop-product-grid .discount-badge { top: 8px; right: 8px; font-size: 11px; }
+.shop-product-grid .product-card-actions { padding: 0 10px 12px; }
 .shop-pagination { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 34px 0 5px; }
 .shop-pagination p { font-size: 12px; color: var(--muted); }
 .shop-pagination strong { color: var(--ink); font-weight: 500; }
@@ -96,6 +97,7 @@ html:has(.shop-filter-drawer[open]) { overflow: hidden; }
   .shop-product-grid .product-details { padding: 12px 13px 15px; }
   .shop-product-grid .current-price { font-size: 18px; }
   .shop-product-grid .original-price { font-size: 12px; }
+  .shop-product-grid .product-card-actions { padding: 0 13px 15px; }
   .shop-summary { margin-bottom: 24px; }
 }
 @media (min-width: 1024px) {
@@ -111,6 +113,7 @@ html:has(.shop-filter-drawer[open]) { overflow: hidden; }
   .shop-product-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 23px 16px; }
   .shop-product-grid .product-name { font-size: 13px; min-height: 37px; }
   .shop-product-grid .product-caption { font-size: 11px; }
+  .shop-product-grid .product-card-actions { padding: 0 13px 16px; }
   .shop-toolbar { padding-block: 25px 20px; }
   .shop-sort select { min-width: 175px; }
   .shop-result-count { min-width: 203px; }
