@@ -138,6 +138,7 @@ section[id] { scroll-margin-top: 22px; }
 .product-link:focus-visible { outline: none; }
 .product-image { display: block; position: relative; overflow: hidden; aspect-ratio: 1.1; width: 100%; background: #eee4db; border-radius: 5px 5px 2px 2px; }
 .product-image > img { transition: transform .3s; }
+.product-photo-placeholder { display: flex; width: 100%; height: 100%; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 12px; background: var(--surface-warm); color: var(--muted); font-size: 11px; text-align: center; }
 .product-link:hover .product-image > img { transform: scale(1.025); }
 .product-details { display: block; padding: 7px 7px 8px; }
 .product-name { display: block; font-size: 11px; line-height: 1.35; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; margin-bottom: 3px; }

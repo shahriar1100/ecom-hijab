@@ -1,6 +1,29 @@
-# Homepage verification
+# Storefront verification
 
 Verified locally on 2026-10-09 with Node.js 22.17, Next.js 16.4, and headless Google Chrome.
+
+## Shop phase
+
+The new route is `/shop`; the homepage's design, photos, section order and product selections are preserved. No new images or dependencies were added. The catalogue has 28 typed local demo products, shared with homepage selections, and all image URLs remain in the data layer. The complete shop browser suite passed against the production build on local port 3100, with no unexpected console or runtime errors.
+
+| Check | Result |
+| --- | --- |
+| ESLint / TypeScript / production build | Passed; `/` and `/shop` are static routes |
+| Responsive shop | 2 mobile, 3 tablet, 4 desktop columns; no page overflow at 320, 360, 390, 768, 834, 1024 or 1440px in either theme |
+| Filter presentation | Desktop sidebar; mobile/tablet modal drawer with draft selections, Apply, Clear and cancel |
+| Keyboard | Drawer initial focus, Tab/Shift+Tab containment, Escape and focus restoration passed |
+| Combined filters | OR within a group, AND across category/fabric/colour/price/search; counts and removable chips passed |
+| Search / sort | Fast typing, editing within text, empty-state clearing, header search and all five sort choices passed |
+| Load More | 12 → 24 → 28 distinct products, correct completion and reset on filter/sort changes |
+| Navigation | All five homepage category links, Shop link, URL reload and Back/Forward passed |
+| Images / product controls | Local images load; simulated missing images show the styled fallback; product controls show Coming soon |
+| Automated accessibility | No axe WCAG 2 A/AA or 2.1 AA violations at 390, 834 or 1440px in either theme, in the drawer or in the empty state |
+| Visual review | Mobile, tablet, desktop and drawer captures inspected in light/dark themes; footer remains clear of mobile navigation |
+| Homepage regression | Existing `check:ui` suite passed at all eight widths in both themes after the shared component changes |
+
+Run `npm run check:shop` against a running local server (`PREVIEW_URL` selects a different URL). Shop screenshots and reports are in the ignored `output/shop-qa/` folder. Full-page captures show fixed navigation at the original viewport edge; maximum-scroll measurements verify footer clearance. These are local demo interactions, with no backend, cart, checkout, authentication or product-detail routes.
+
+## Homepage and theme checks
 
 | Check | Result |
 | --- | --- |

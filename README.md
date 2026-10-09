@@ -1,6 +1,6 @@
-# NOOR — homepage phase
+# NOOR — storefront preview
 
-A responsive hijab boutique homepage with light and dark themes, built with Next.js App Router, TypeScript and Tailwind CSS. Only `/` is implemented. There are no commerce services, other pages, API routes, authentication, payments or deployment configuration.
+A responsive hijab boutique homepage and shop with light and dark themes, built with Next.js App Router, TypeScript and Tailwind CSS. Routes are `/` and `/shop`. There are no commerce services, product-detail pages, API routes, authentication, payments or deployment configuration.
 
 ## Run locally
 
@@ -26,13 +26,20 @@ With the local server running, `npm run check:ui` checks widths 320, 360, 390, 7
 
 See [verification results and known demo limitations](docs/verification.md).
 
-## Editing the homepage
+`npm run check:shop` checks the shop in both themes at 320, 360, 390, 768, 834, 1024 and 1440px. It covers responsive grids, sidebar/drawer behaviour, focus containment and restoration, Apply/Clear, combined filters, sorting, search, pagination, query links and browser history, image loading/fallback and axe accessibility. Its reports and screenshots are saved to the ignored `output/shop-qa/` folder.
 
-- `src/data/store.ts`: typed demo products, prices in BDT, stories, categories, image paths, navigation, demo contacts and the static sale timer.
+## Editing the storefront
+
+- `src/data/catalog.ts`: the shared typed catalogue of 28 demo products, BDT prices, fabric/category/colour and dates used for sorting. Homepage selections use this same catalogue while preserving their approved names, prices, images and order.
+- `src/data/photos.ts`: every photo URL, alt description and crop position, ready to be replaced with future uploaded assets.
+- `src/data/store.ts`: homepage product selections, stories, category links, navigation, demo contacts and the static sale timer.
+- `src/data/shop-options.ts` and `src/lib/shop.ts`: typed filter choices, URL parsing, filtering and sorting.
 - `src/types/store.ts`: shared data types.
 - `src/components/home/`: homepage sections; `product/`: reusable product card; `layout/`: header, footer and bottom navigation.
+- `src/components/shop/`: interactive catalogue, shared filter fields and Load More. The page title and shared frame remain Server Components. A small product-photo component provides a simple styled placeholder if an image fails.
 - `src/app/globals.css`: brand tokens, layout and responsive styling. The main breakpoints are 768px (tablet), 1024px (desktop), and 1200px (expanded desktop search).
-- `public/images/`: optimized local WebP placeholder photos. Replace these files or update the paths and alt text in `store.ts`. Use a wide hero photo with space for text on the left, square portraits, folded fabrics, circular-crop-friendly fabric photos, and an accessories flatlay. The original reference photographs are still needed for an exact photo match.
+- `src/app/shop/shop.css`: scoped shop styles; desktop filters start at 1024px, and the catalogue uses 2/3/4 columns at mobile/tablet/desktop widths.
+- `public/images/`: existing local WebP assets. Replace these files or update `photos.ts`. No new pictures were created for the shop. A future remote image host also needs an explicit `images.remotePatterns` entry in `next.config.ts`.
 
 The placeholders were generated specifically for this mockup using the built-in image-generation tool. No screenshots or screenshot fragments are used as page content. See [demo image provenance and prompts](docs/demo-images.md).
 
@@ -42,12 +49,16 @@ For future changes, use supplied or existing images only. Do not generate new im
 
 ## Preview behaviour
 
-The hero CTA and navigation links scroll to homepage sections. Search accepts local text and explains that search is coming soon. Product, category, story, saved, account, bag, social and other unfinished controls show accessible Coming soon feedback; they do not change inventory or perform commerce actions. The bag count of 3 is a visual demo, and contact details are explicitly marked as placeholders. The sale timer is a **static demo**, not a live deadline.
+The homepage hero CTA and section links still scroll to their original sections. Header Shop and homepage category links now open `/shop`; category links preselect their corresponding fabric or Accessories. Product, story, saved, account, bag, social and other unfinished controls keep their Coming soon feedback. No product links lead to unbuilt pages. The bag count of 3, contact details and static sale timer remain demo content.
+
+The shop searches names, fabrics, colours and categories as you type. Options within a filter group are ORed; separate groups and the search are ANDed. Price bands use the displayed current price (including demo discounts). Sort options are featured order, newest, price ascending/descending, and name. Load More adds 12 products; changing search, filters or sort starts again with 12. The empty state clears all filters and search. Mobile/tablet drawer selections are drafts until Apply; Clear resets the draft, and Escape/close discards it. The desktop sidebar applies changes immediately.
+
+Shop state is shareable through query parameters: `q`, comma-separated `fabric`, `category`, `colour`, `price`, and `sort`. Example: `/shop?fabric=modal&colour=rose&price=500-699`. Unknown values are ignored. The [Next.js native History API](https://nextjs.org/docs/app/getting-started/linking-and-navigating#native-history-api) keeps filtering, reload and Back/Forward synchronized. A synchronous URL subscription keeps controlled inputs responsive during router transitions, including fast typing and history navigation. Search uses replacement history so each keystroke does not add an entry. The shop header search also works; the homepage's original search preview behaviour is preserved.
 
 Stories directly follow the hero. Categories stay in a single compact circular row. New Items and Most Popular scroll horizontally on mobile, then show three tablet cards and four desktop cards. Flash Sale uses three columns on mobile/tablet and six on desktop. Just For You uses 2/3/4 columns; its curated preview contains four cards on mobile/desktop and six on tablet, following the supplied designs. The footer is visible on every device. Mobile/tablet also retain fixed navigation, with safe-area padding below the footer to keep its content accessible.
 
 The header's moon/sun button toggles dark mode. On the first visit, the page follows the device's colour preference; a manual choice is saved in `localStorage` under `noor-theme` and synchronized between tabs. A small head script applies the theme before the first paint. With storage blocked, the toggle still works for the current visit. Theme colours are CSS variables in `globals.css`; existing photographs retain their natural colours.
 
-Static page and section content are Server Components. Client components are limited to interactive buttons, the feedback notice, search, and the theme toggle. The toggle subscribes to browser state with React's [useSyncExternalStore](https://react.dev/reference/react/useSyncExternalStore); the initial theme follows [prefers-color-scheme](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/At-rules/@media/prefers-color-scheme). System fonts avoid external font requests.
+Static page and section content are Server Components. Client components handle interactive buttons, feedback, search, the catalogue and drawer, photo failure fallback, and theme selection. The native [modal dialog](https://developer.mozilla.org/en-US/docs/Web/API/HTMLDialogElement/showModal) makes background content inert; drawer keyboard handling wraps focus and restores it on close. The theme toggle uses React's [useSyncExternalStore](https://react.dev/reference/react/useSyncExternalStore), with the initial theme following [prefers-color-scheme](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/At-rules/@media/prefers-color-scheme). System fonts avoid external font requests.
 
 Setup follows the official [Next.js installation guide](https://nextjs.org/docs/app/getting-started/installation) and [Tailwind PostCSS guide](https://tailwindcss.com/docs/installation/using-postcss).
