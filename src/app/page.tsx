@@ -7,19 +7,31 @@ import { CategoriesSection } from "@/components/home/categories-section";
 import { TopProductsSection } from "@/components/home/top-products-section";
 import { ProductSection } from "@/components/home/product-section";
 import { FlashSaleSection } from "@/components/home/flash-sale-section";
-import { newItems, popularProducts, recommendedProducts } from "@/data/store";
+import { getHomepageCollections } from "@/lib/server/store-repository";
 
-export default function HomePage() {
+export default async function HomePage() {
+  const {
+    heroBanner,
+    flashSale,
+    homepageStories,
+    homepageCategories,
+    newItems,
+    saleProducts,
+    popularProducts,
+    recommendedProducts,
+    topProducts,
+  } = await getHomepageCollections();
+
   return (
     <div id="home">
       <SiteHeader />
       <main id="main-content" className="page-container homepage">
-        <HeroBanner />
-        <StoriesSection />
-        <CategoriesSection />
-        <TopProductsSection />
+        <HeroBanner banner={heroBanner} />
+        <StoriesSection stories={homepageStories} />
+        <CategoriesSection categories={homepageCategories} />
+        <TopProductsSection products={topProducts} />
         <ProductSection id="new-items" title="New Items" products={newItems} layout="new-items" />
-        <FlashSaleSection />
+        <FlashSaleSection products={saleProducts} flashSale={flashSale} />
         <ProductSection id="most-popular" title="Most Popular" products={popularProducts} layout="popular" />
         <ProductSection id="just-for-you" title="Just For You" products={recommendedProducts} layout="for-you" />
       </main>

@@ -59,8 +59,12 @@ try {
       await page.getByRole("button", { name: "Increase quantity", exact: true }).click();
       await expect(page.getByLabel("Selected quantity", { exact: true })).toHaveText("2");
       await page.getByRole("button", { name: "Add to Bag", exact: true }).click();
-      await expect(page.locator("#cart-feature-note")).toHaveText("Cart feature coming next");
-      await expect(page.locator(".mobile-bottom-nav .bag-badge")).toHaveText("3");
+      await expect(page.locator("#cart-feature-note")).toHaveText("Added 2 to your shopping bag");
+      if (width < 1024) {
+        await expect(page.locator(".mobile-bottom-nav .bag-badge")).toHaveText("2");
+      } else {
+        await expect(page.locator(".site-header .bag-badge")).toHaveText("2");
+      }
       reports.push(layout);
       console.log(`PASS ${theme} ${width}px: product layout, gallery, images, quantity, feedback and footer`);
       await context.close();

@@ -1,9 +1,9 @@
-import type { CatalogProduct, Fabric, Photo, ProductColour, ProductDetails, ProductVariant } from "@/types/store";
+import type { CatalogProduct, Photo, ProductColour, ProductDetails, ProductVariant } from "@/types/store";
 import { photos } from "./photos";
 
 // Local preview data only. Replace dimensions, stock and variant image URLs with
 // real catalogue data later; the page does not infer inventory or generate photos.
-const colourGalleries: Record<ProductColour, [Photo, ...Photo[]]> = {
+const colourGalleries: Record<string, [Photo, ...Photo[]]> = {
   rose: [photos.rose, photos.roseFolds],
   olive: [photos.olive, photos.jersey],
   black: [photos.black],
@@ -15,11 +15,11 @@ const colourGalleries: Record<ProductColour, [Photo, ...Photo[]]> = {
   gold: [photos.accessories],
 };
 
-const demoStock: Record<ProductColour, number> = {
+const demoStock: Record<string, number> = {
   rose: 8, olive: 7, black: 12, sand: 4, mocha: 6, mauve: 3, burgundy: 0, multi: 10, gold: 12,
 };
 
-const fabricDetails: Record<Fabric, { material: string; size: string; description: string; colours: ProductColour[] }> = {
+const fabricDetails: Record<string, { material: string; size: string; description: string; colours: ProductColour[] }> = {
   modal: { material: "Modal", size: "180 × 70 cm", description: "A soft, fluid drape for everyday styling. An effortless finishing touch, from quiet mornings to evenings out.", colours: ["rose", "sand", "mocha", "black", "mauve", "burgundy"] },
   chiffon: { material: "Chiffon", size: "180 × 70 cm", description: "Light, airy layers with a delicate finish. A versatile piece to fold, drape and style your own way.", colours: ["rose", "sand", "black"] },
   jersey: { material: "Jersey", size: "180 × 75 cm", description: "An easy, relaxed drape with a comfortable feel. A simple companion for your everyday wardrobe.", colours: ["olive", "black"] },
@@ -34,22 +34,28 @@ const accessoryDetails: Record<string, { material: string; size: string; descrip
 
 export function createDemoDetails(product: Pick<CatalogProduct, "id" | "category" | "fabric" | "colour" | "photo">): ProductDetails {
   const fabric = product.fabric ? fabricDetails[product.fabric] : null;
+  const fallbackMaterial = product.fabric
+    ? product.fabric.charAt(0).toUpperCase() + product.fabric.slice(1)
+    : product.category.charAt(0).toUpperCase() + product.category.slice(1);
   const information = fabric ?? accessoryDetails[product.id] ?? {
-    material: "Accessories", size: "One size", description: "A thoughtful finishing touch for your everyday collection.",
+    material: fallbackMaterial,
+    size: product.category === "accessories" ? "One size" : "180 × 70 cm",
+    description: "A thoughtful finishing touch for your everyday collection.",
   };
 
   function variant(colour: ProductColour, primary: Photo): ProductVariant {
-    const extras = product.category === "accessories" ? [] : colourGalleries[colour].filter((photo) => photo.src !== primary.src);
-    return { colour, stock: demoStock[colour], gallery: [primary, ...extras] };
+    const galleryList = colourGalleries[colour] ?? [primary];
+    const extras = product.category === "accessories" ? [] : galleryList.filter((photo) => photo.src !== primary.src);
+    return { colour, stock: demoStock[colour] ?? 8, gallery: [primary, ...extras] };
   }
 
   return {
     description: information.description,
     material: information.material,
     size: information.size,
-    deliveryNote: "Delivery timings and charges will be shared when ordering opens.",
+    deliveryNote: "Nationwide delivery across Bangladesh (1–2 days inside Dhaka, 3–5 days outside Dhaka).",
     variants: [variant(product.colour, product.photo), ...(fabric?.colours ?? [])
-      .filter((colour) => colour !== product.colour)
+      .filter((colour) => colour !== product.colour && Boolean(colourGalleries[colour]))
       .map((colour) => variant(colour, colourGalleries[colour][0]))],
   };
 }

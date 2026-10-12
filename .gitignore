@@ -8,3 +8,6 @@ next-env.d.ts
 .DS_Store
 /.qa/
 /output/
+/data/runtime-store.json
+/public/uploads/
+

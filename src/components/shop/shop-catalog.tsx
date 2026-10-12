@@ -4,7 +4,14 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useSearchParams } from "next/navigation";
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import type { CatalogProduct } from "@/types/store";
-import { categoryOptions, colourOptions, fabricOptions, priceOptions, sortOptions } from "@/data/shop-options";
+import {
+  categoryOptions,
+  colourOptions,
+  fabricOptions,
+  priceOptions,
+  sortOptions,
+  type CatalogTaxonomy,
+} from "@/data/shop-options";
 import { emptyFilters, filterCount, filterProducts, parseShopFilters, shopUrl, type ShopFilters } from "@/lib/shop";
 import { FilterFields } from "./filter-fields";
 import { ShopResults } from "./shop-results";
@@ -22,13 +29,19 @@ function subscribeToFilterURL(onChange: () => void) {
 
 function readFilterURL() { return window.location.search.slice(1); }
 
-export function ShopCatalog({ products }: { products: CatalogProduct[] }) {
+export function ShopCatalog({
+  products,
+  taxonomy,
+}: {
+  products: CatalogProduct[];
+  taxonomy?: CatalogTaxonomy;
+}) {
   // Also subscribe to Next navigation so header/category links refresh this page.
   const searchParams = useSearchParams();
   // Read the browser URL synchronously for controlled inputs and Back/Forward.
   // Waiting for a router transition can otherwise lose fast input characters.
   const queryString = useSyncExternalStore(subscribeToFilterURL, readFilterURL, () => searchParams.toString());
-  const filters = parseShopFilters(new URLSearchParams(queryString));
+  const filters = parseShopFilters(new URLSearchParams(queryString), taxonomy);
   const matching = filterProducts(products, filters);
   const selectedCount = filterCount(filters);
   const hasFilters = selectedCount > 0 || Boolean(filters.query.trim());
@@ -64,9 +77,21 @@ export function ShopCatalog({ products }: { products: CatalogProduct[] }) {
   }, []);
 
   const groups = [
-    { key: "categories", label: "Category", options: categoryOptions },
-    { key: "fabrics", label: "Fabric", options: fabricOptions },
-    { key: "colours", label: "Colour", options: colourOptions },
+    {
+      key: "categories",
+      label: "Category",
+      options: taxonomy?.categories?.length ? taxonomy.categories : categoryOptions,
+    },
+    {
+      key: "fabrics",
+      label: "Fabric",
+      options: taxonomy?.fabrics?.length ? taxonomy.fabrics : fabricOptions,
+    },
+    {
+      key: "colours",
+      label: "Colour",
+      options: taxonomy?.colours?.length ? taxonomy.colours : colourOptions,
+    },
   ] as const;
 
   return <div className="shop-catalog">
@@ -92,7 +117,7 @@ export function ShopCatalog({ products }: { products: CatalogProduct[] }) {
     </div>
 
     <div className="shop-layout">
-      <aside className="shop-sidebar" aria-label="Product filters"><div className="shop-sidebar-heading"><h2>Filters</h2><button type="button" className="shop-clear-link" disabled={!hasFilters} onClick={() => updateFilters(emptyFilters)}>Clear</button></div><FilterFields value={filters} onChange={updateFilters} prefix="sidebar" /></aside>
+      <aside className="shop-sidebar" aria-label="Product filters"><div className="shop-sidebar-heading"><h2>Filters</h2><button type="button" className="shop-clear-link" disabled={!hasFilters} onClick={() => updateFilters(emptyFilters)}>Clear</button></div><FilterFields value={filters} onChange={updateFilters} prefix="sidebar" taxonomy={taxonomy} /></aside>
       <section className="shop-results" aria-labelledby="shop-products-heading"><h2 id="shop-products-heading" className="sr-only">Products</h2><ShopResults key={shopUrl(filters)} products={matching} onClear={() => updateFilters(emptyFilters)} /></section>
     </div>
 
@@ -105,7 +130,7 @@ export function ShopCatalog({ products }: { products: CatalogProduct[] }) {
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
     }}>
       <div className="shop-drawer-shell"><div className="shop-drawer-heading"><div><h2 id="shop-filter-title">Find your favourites</h2><p id="shop-filter-description">Choose your filters, then apply.</p></div><button type="button" className="icon-button" aria-label="Close filters" onClick={closeDrawer}><X size={22} /></button></div>
-        <div className="shop-drawer-scroll"><FilterFields value={draft} onChange={setDraft} prefix="drawer" /></div>
+        <div className="shop-drawer-scroll"><FilterFields value={draft} onChange={setDraft} prefix="drawer" taxonomy={taxonomy} /></div>
         <div className="shop-drawer-actions"><button type="button" className="shop-clear-button" onClick={() => setDraft({ ...emptyFilters, sort: draft.sort })}>Clear</button><button type="button" className="shop-primary-button" onClick={() => { updateFilters(draft); closeDrawer(); }}>Apply filters <span>({draftCount})</span></button></div>
       </div>
     </dialog>

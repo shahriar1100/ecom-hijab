@@ -61,7 +61,7 @@ try {
     });
     assert.ok(layout.documentWidth <= width, `Page overflow at ${width}px: ${layout.documentWidth}px`);
     assert.equal(layout.recommendationColumns, width < 768 ? 2 : width < 1024 ? 3 : 4);
-    assert.equal(layout.saleColumns, width < 1024 ? 3 : 6);
+    assert.equal(layout.saleColumns, width < 768 ? 2 : width < 1024 ? 3 : 4);
     assert.equal(layout.categoryRows, 1, "Categories must remain one row");
     assert.equal(layout.navVisible, width < 1024);
     assert.equal(layout.footerVisible, true, `Footer missing at ${width}px`);
@@ -91,8 +91,6 @@ try {
       await page.getByRole("button", { name: "Open search", exact: true }).click();
       const dialog = page.getByRole("dialog");
       await dialog.getByRole("textbox", { name: "Search hijabs, colors or styles" }).fill("olive");
-      await dialog.getByRole("button", { name: "Submit search" }).click();
-      await dialog.getByRole("status").filter({ hasText: "Coming soon" }).waitFor();
       if (width === 390) {
         const dialogAccessibility = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze();
         assert.deepEqual(dialogAccessibility.violations.map(({ id }) => id), [], `${colorScheme} search accessibility`);
@@ -100,10 +98,14 @@ try {
       await page.keyboard.press("Escape");
       assert.equal(await dialog.isVisible(), false);
       assert.equal(await page.getByRole("button", { name: "Open search", exact: true }).evaluate((button) => button === document.activeElement), true);
+      await page.getByRole("button", { name: "Open search", exact: true }).click();
+      await dialog.getByRole("textbox", { name: "Search hijabs, colors or styles" }).fill("olive");
+      await dialog.getByRole("button", { name: "Submit search" }).click();
+      await page.waitForURL("**/shop?q=olive");
     } else {
       await page.getByRole("textbox", { name: "Search hijabs", exact: true }).fill("olive");
       await page.getByRole("textbox", { name: "Search hijabs", exact: true }).press("Enter");
-      await page.getByRole("status").filter({ hasText: "Coming soon" }).waitFor();
+      await page.waitForURL("**/shop?q=olive");
     }
 
     console.log(`PASS ${colorScheme} ${width}px: footer visible, no overlap/overflow; images, grids and interactions OK`);

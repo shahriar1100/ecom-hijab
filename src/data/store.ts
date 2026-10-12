@@ -17,6 +17,15 @@ export const categories: Category[] = [
   { id: "accessories", name: "Accessories", photo: photos.accessories, href: "/shop?category=accessories" },
 ];
 
+export const sliderCategories: Category[] = [
+  ...categories,
+  { id: "everyday-modal", name: "Daily Wear", photo: photos.rose, href: "/shop?fabric=modal" },
+  { id: "occasion-silk", name: "Party Silk", photo: photos.mauve, href: "/shop?fabric=silk" },
+  { id: "instant-jersey", name: "Instant Hijab", photo: photos.olive, href: "/shop?fabric=jersey" },
+  { id: "signature-chiffon", name: "Luxury Chiffon", photo: photos.sand, href: "/shop?fabric=chiffon" },
+  { id: "gift-sets", name: "Gift Bundles", photo: photos.folded, href: "/shop?category=hijabs" },
+];
+
 export const stories: Story[] = [
   { id: "new-in", label: "New In", photo: photos.burgundy, avatar: photos.rose },
   { id: "modal-edit", label: "Modal Edit", photo: photos.folded, avatar: photos.black },
@@ -38,16 +47,16 @@ export const saleProducts = selectProducts([
 ]);
 
 export const popularProducts = selectProducts([
-  "popular-mocha", "popular-black", "popular-sand", "popular-mauve", "popular-olive",
+  "sale-mocha", "popular-black", "popular-sand", "popular-mauve", "popular-olive",
 ]);
 
 export const recommendedProducts = selectProducts([
-  "for-you-rose", "for-you-modal", "for-you-jersey", "for-you-mauve", "for-you-black", "for-you-silk",
+  "for-you-rose", "for-you-modal", "jersey-olive", "for-you-mauve", "for-you-black", "for-you-silk",
 ]);
 
 export const topProducts = selectProducts([
   "popular-sand", "chiffon-classics", "popular-black", "top-jersey", "premium-modal-rose",
-  "sale-essentials", "jersey-olive", "silk-mauve", "popular-mocha", "sale-colors",
+  "sale-essentials", "jersey-olive", "silk-mauve", "sale-mocha", "sale-colors",
 ]);
 
 export const navigation: NavItem[] = [
@@ -65,11 +74,13 @@ export const footerLinks: { title: string; items: NavItem[] }[] = [
     { label: "Accessories", href: "/shop?category=accessories" },
   ] },
   { title: "Help", items: [
-    { label: "Size Guide", feature: "Size guide" },
-    { label: "Care Instructions", feature: "Care instructions" },
-    { label: "Shipping & Delivery", feature: "Shipping information" },
-    { label: "Returns & Exchanges", feature: "Returns and exchanges" },
-    { label: "FAQs", feature: "FAQs" },
+    { label: "Size Guide", href: "/size-guide" },
+    { label: "Care Instructions", href: "/care-instructions" },
+    { label: "Shipping & Delivery", href: "/shipping-returns" },
+    { label: "Returns & Exchanges", href: "/shipping-returns#returns" },
+    { label: "FAQs", href: "/faq" },
+    { label: "About Us", href: "/about" },
+    { label: "Contact Us", href: "/contact" },
   ] },
 ];
 

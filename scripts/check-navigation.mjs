@@ -40,17 +40,17 @@ try {
           await expect(trigger).not.toBeVisible();
           await expect(bottom).not.toBeVisible();
           await expect(header.getByRole("button", { name: "Dark mode", exact: true })).toBeVisible();
-          await expect(header.getByRole("button", { name: "Shopping bag — Coming soon", exact: true })).toBeVisible();
+          await expect(header.getByRole("button", { name: /^Shopping bag/ })).toBeVisible();
           await expect(header.getByRole("navigation", { name: "Main navigation", exact: true })).toBeVisible();
         } else {
           await expect(header.getByRole("link", { name: "NOOR home", exact: true })).toBeVisible();
           assert.deepEqual(await header.getByRole("button").allTextContents(), ["", ""]);
           await expect(header.getByRole("button", { name: "Open search", exact: true })).toBeVisible();
           await expect(trigger).toBeVisible();
-          await expect(header.getByRole("button", { name: "Shopping bag — Coming soon", exact: true })).not.toBeVisible();
+          await expect(header.getByRole("button", { name: /^Shopping bag/ })).not.toBeVisible();
           assert.deepEqual(await bottom.locator(".bottom-nav-item > span:last-child").allTextContents(), ["Home", "Shop", "Saved", "Bag", "Account"]);
           await expect(bottom.locator('[aria-current="page"]')).toHaveText(path === "/" ? "Home" : "Shop");
-          await expect(bottom.locator(".bag-badge")).toHaveText("3");
+          await expect(bottom.locator(".bag-badge")).toHaveCount(0);
           await page.evaluate(() => scrollTo(0, document.body.scrollHeight));
           await expect.poll(() => page.evaluate(() => document.querySelector(".mobile-bottom-nav").getBoundingClientRect().top - document.querySelector(".footer-grid").getBoundingClientRect().bottom)).toBeGreaterThan(20);
           await page.evaluate(() => scrollTo(0, 0));

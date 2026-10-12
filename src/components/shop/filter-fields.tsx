@@ -1,11 +1,39 @@
-import { categoryOptions, colourOptions, fabricOptions, priceOptions } from "@/data/shop-options";
+import {
+  categoryOptions,
+  colourOptions,
+  fabricOptions,
+  priceOptions,
+  type CatalogTaxonomy,
+} from "@/data/shop-options";
 import type { ShopFilters } from "@/lib/shop";
 
-export function FilterFields({ value, onChange, prefix }: { value: ShopFilters; onChange: (filters: ShopFilters) => void; prefix: string }) {
+export function FilterFields({
+  value,
+  onChange,
+  prefix,
+  taxonomy,
+}: {
+  value: ShopFilters;
+  onChange: (filters: ShopFilters) => void;
+  prefix: string;
+  taxonomy?: CatalogTaxonomy;
+}) {
   const groups = [
-    { key: "categories", label: "Category", options: categoryOptions },
-    { key: "fabrics", label: "Fabric", options: fabricOptions },
-    { key: "colours", label: "Colour", options: colourOptions },
+    {
+      key: "categories",
+      label: "Category",
+      options: taxonomy?.categories?.length ? taxonomy.categories : categoryOptions,
+    },
+    {
+      key: "fabrics",
+      label: "Fabric",
+      options: taxonomy?.fabrics?.length ? taxonomy.fabrics : fabricOptions,
+    },
+    {
+      key: "colours",
+      label: "Colour",
+      options: taxonomy?.colours?.length ? taxonomy.colours : colourOptions,
+    },
   ] as const;
 
   return (

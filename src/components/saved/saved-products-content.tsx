@@ -3,15 +3,14 @@
 import Link from "next/link";
 import { Heart } from "lucide-react";
 import { catalogProducts } from "@/data/catalog";
+import type { CatalogProduct } from "@/types/store";
 import { useSavedProducts } from "@/lib/saved-products";
 import { ProductCard } from "@/components/product/product-card";
 
-const productsById = new Map(catalogProducts.map((product) => [product.id, product]));
-
-export function SavedProductsContent() {
+export function SavedProductsContent({ catalog = catalogProducts }: { catalog?: CatalogProduct[] }) {
   const { ids, ready } = useSavedProducts();
   const products = ids.flatMap((id) => {
-    const product = productsById.get(id);
+    const product = catalog.find((p) => p.id === id) ?? catalogProducts.find((p) => p.id === id);
     return product ? [product] : [];
   });
 

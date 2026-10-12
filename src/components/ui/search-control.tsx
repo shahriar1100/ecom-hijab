@@ -6,7 +6,7 @@ import { announceComingSoon } from "./coming-soon";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
-export function SearchControl({ catalogSearch = false }: { catalogSearch?: boolean }) {
+export function SearchControl({ catalogSearch = true }: { catalogSearch?: boolean }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [feedback, setFeedback] = useState(false);

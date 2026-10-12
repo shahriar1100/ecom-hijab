@@ -8,14 +8,27 @@ export type Product = {
   id: string;
   slug: string;
   name: string;
+  description?: string;
   price: number;
   originalPrice?: number;
   photo: Photo;
+  stock?: number;
+  details?: ProductDetails;
 };
 
-export type Fabric = "modal" | "chiffon" | "jersey" | "silk";
-export type ProductCategory = "hijabs" | "accessories";
-export type ProductColour = "rose" | "olive" | "black" | "sand" | "mocha" | "mauve" | "burgundy" | "multi" | "gold";
+export type Fabric = "modal" | "chiffon" | "jersey" | "silk" | (string & {});
+export type ProductCategory = "hijabs" | "accessories" | (string & {});
+export type ProductColour =
+  | "rose"
+  | "olive"
+  | "black"
+  | "sand"
+  | "mocha"
+  | "mauve"
+  | "burgundy"
+  | "multi"
+  | "gold"
+  | (string & {});
 
 export type ProductVariant = {
   colour: ProductColour;
@@ -44,6 +57,8 @@ export type Story = {
   label: string;
   photo: Photo;
   avatar: Photo;
+  videoSrc?: string;
+  href?: string;
 };
 
 export type Category = { id: string; name: string; photo: Photo; href: string };

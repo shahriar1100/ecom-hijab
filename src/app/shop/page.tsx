@@ -6,7 +6,7 @@ import { SiteHeader } from "@/components/layout/site-header";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav";
 import { ShopCatalog } from "@/components/shop/shop-catalog";
-import { catalogProducts } from "@/data/catalog";
+import { getAllStoreProducts, getStoreSettings } from "@/lib/server/store-repository";
 import "./shop.css";
 
 export const metadata: Metadata = {
@@ -14,13 +14,17 @@ export const metadata: Metadata = {
   description: "Find your everyday favourite. Explore NOOR hijabs and accessories by fabric, colour and price.",
 };
 
-export default function ShopPage() {
+export default async function ShopPage() {
+  const [products, settings] = await Promise.all([
+    getAllStoreProducts(),
+    getStoreSettings(),
+  ]);
   return <>
     <SiteHeader activePage="shop" />
     <main id="main-content" className="page-container shop-page">
       <nav className="shop-breadcrumb" aria-label="Breadcrumb"><Link href="/">Home</Link><ChevronRight size={13} aria-hidden="true" /><span aria-current="page">Shop</span></nav>
       <div className="shop-intro"><span className="shop-eyebrow">THE NOOR COLLECTION</span><h1>Shop the collection</h1><p>Beautiful fabrics, thoughtful colours. Find your everyday favourite.</p></div>
-      <Suspense fallback={<div className="shop-loading" role="status">Loading the collection…</div>}><ShopCatalog products={catalogProducts} /></Suspense>
+      <Suspense fallback={<div className="shop-loading" role="status">Loading the collection…</div>}><ShopCatalog products={products} taxonomy={settings.taxonomy} /></Suspense>
     </main>
     <SiteFooter />
     <MobileBottomNav activePage="shop" />

@@ -1,5 +1,14 @@
 import type { CatalogProduct, Fabric, ProductCategory, ProductColour } from "@/types/store";
-import { categoryOptions, colourOptions, fabricOptions, priceOptions, sortOptions, type PriceBand, type ShopSort } from "@/data/shop-options";
+import {
+  categoryOptions,
+  colourOptions,
+  fabricOptions,
+  priceOptions,
+  sortOptions,
+  type CatalogTaxonomy,
+  type PriceBand,
+  type ShopSort,
+} from "@/data/shop-options";
 
 export type ShopFilters = {
   query: string;
@@ -15,16 +24,23 @@ export const emptyFilters: ShopFilters = { query: "", categories: [], fabrics: [
 
 type SearchParams = Pick<URLSearchParams, "get" | "getAll">;
 
-export function parseShopFilters(params: SearchParams): ShopFilters {
+export function parseShopFilters(
+  params: SearchParams,
+  taxonomy?: CatalogTaxonomy,
+): ShopFilters {
+  const activeCategories = taxonomy?.categories?.length ? taxonomy.categories : categoryOptions;
+  const activeFabrics = taxonomy?.fabrics?.length ? taxonomy.fabrics : fabricOptions;
+  const activeColours = taxonomy?.colours?.length ? taxonomy.colours : colourOptions;
+
   function selected<T extends string>(key: string, options: readonly { value: T }[]): T[] {
     const values = params.getAll(key).flatMap((value) => value.split(","));
     return options.filter((option) => values.includes(option.value)).map((option) => option.value);
   }
   return {
     query: (params.get("q") ?? "").slice(0, 160),
-    categories: selected("category", categoryOptions),
-    fabrics: selected("fabric", fabricOptions),
-    colours: selected("colour", colourOptions),
+    categories: selected("category", activeCategories),
+    fabrics: selected("fabric", activeFabrics),
+    colours: selected("colour", activeColours),
     price: priceOptions.find((option) => option.value === params.get("price"))?.value ?? "all",
     sort: sortOptions.find((option) => option.value === params.get("sort"))?.value ?? "featured",
   };

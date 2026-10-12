@@ -1,12 +1,10 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { catalogProducts } from "@/data/catalog";
 
 export const SAVED_STORAGE_KEY = "noor-saved-products";
 type SavedState = { ids: readonly string[]; ready: boolean; persistent: boolean };
 const serverState: SavedState = { ids: [], ready: false, persistent: true };
-const validIDs = new Set(catalogProducts.map(({ id }) => id));
 let state = serverState;
 let lastRaw: string | null | undefined;
 let visitOnly = false;
@@ -15,8 +13,18 @@ const listeners = new Set<() => void>();
 function parseIDs(raw: string | null): string[] {
   try {
     const value: unknown = JSON.parse(raw ?? "[]");
-    return Array.isArray(value) ? [...new Set(value.filter((id): id is string => typeof id === "string" && validIDs.has(id)))] : [];
-  } catch { return []; }
+    return Array.isArray(value)
+      ? [
+          ...new Set(
+            value.filter(
+              (id): id is string => typeof id === "string" && id.trim().length > 0,
+            ),
+          ),
+        ]
+      : [];
+  } catch {
+    return [];
+  }
 }
 
 function getSnapshot(): SavedState {
@@ -34,7 +42,9 @@ function getSnapshot(): SavedState {
   return state;
 }
 
-function notify() { listeners.forEach((listener) => listener()); }
+function notify() {
+  listeners.forEach((listener) => listener());
+}
 function onStorage(event: StorageEvent) {
   if (event.key === SAVED_STORAGE_KEY || event.key === null) notify();
 }
@@ -50,8 +60,12 @@ function subscribe(listener: () => void) {
 function write(ids: readonly string[]): SavedState {
   const raw = JSON.stringify(ids);
   if (!visitOnly) {
-    try { localStorage.setItem(SAVED_STORAGE_KEY, raw); lastRaw = raw; }
-    catch { visitOnly = true; }
+    try {
+      localStorage.setItem(SAVED_STORAGE_KEY, raw);
+      lastRaw = raw;
+    } catch {
+      visitOnly = true;
+    }
   }
   state = { ids, ready: true, persistent: !visitOnly };
   notify();
@@ -60,11 +74,18 @@ function write(ids: readonly string[]): SavedState {
 
 export function toggleSavedProduct(id: string) {
   const current = getSnapshot();
-  if (!validIDs.has(id)) return { saved: false, persistent: current.persistent };
-  const saved = !current.ids.includes(id);
-  const next = write(saved ? [id, ...current.ids] : current.ids.filter((value) => value !== id));
+  const cleanId = id.trim();
+  if (!cleanId) return { saved: false, persistent: current.persistent };
+  const saved = !current.ids.includes(cleanId);
+  const next = write(
+    saved ? [cleanId, ...current.ids] : current.ids.filter((value) => value !== cleanId),
+  );
   return { saved, persistent: next.persistent };
 }
 
-export function clearSavedProducts() { return write([]); }
-export function useSavedProducts() { return useSyncExternalStore(subscribe, getSnapshot, () => serverState); }
+export function clearSavedProducts() {
+  return write([]);
+}
+export function useSavedProducts() {
+  return useSyncExternalStore(subscribe, getSnapshot, () => serverState);
+}
