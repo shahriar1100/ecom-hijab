@@ -30,9 +30,7 @@ export function ProductSection({ id, title, products, layout }: Props) {
   const seeAllHref =
     layout === "new-items"
       ? "/shop?sort=newest"
-      : layout === "popular"
-        ? "/shop"
-        : undefined;
+      : "/shop";
 
   return (
     <section id={id} className={`home-section product-showcase-section ${layout}-section`} aria-labelledby={`${id}-title`}>
@@ -42,12 +40,12 @@ export function ProductSection({ id, title, products, layout }: Props) {
         badge={meta.badge}
         badgeIcon={meta.icon}
         subtitle={meta.subtitle}
-        seeAll={layout !== "for-you"}
+        seeAll
         seeAllHref={seeAllHref}
       >
         {layout === "for-you" && <Star size={19} fill="currentColor" className="recommendation-star" aria-hidden="true" />}
       </SectionHeading>
-      <div className={`product-grid ${layout}-grid ${layout !== "for-you" ? "scroll-row" : ""}`}>
+      <div className={`product-grid ${layout}-grid`}>
         {products.map((product) => (
           <ProductCard key={product.id} product={product} variant={layout === "popular" ? "compact" : "standard"} />
         ))}

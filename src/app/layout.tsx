@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { ComingSoonNotice } from "@/components/ui/coming-soon";
 import { CartDrawer } from "@/components/cart/cart-drawer";
+import { StorefrontMotion } from "@/components/ui/motion-reveal";
 import { themeInitScript } from "@/lib/theme";
 import "./globals.css";
 
@@ -25,6 +26,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           Skip to content
         </a>
         {children}
+        <StorefrontMotion />
         <CartDrawer />
         <ComingSoonNotice />
       </body>

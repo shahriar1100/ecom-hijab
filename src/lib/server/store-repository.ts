@@ -157,6 +157,7 @@ export type AdminSettingsRecord = {
   contactLocation?: string;
   socialLinks?: StoreSocialLinks;
   heroBanner: HeroBannerConfig;
+  heroSlides: HeroBannerConfig[];
   flashSale: FlashSaleConfig;
   taxonomy: CatalogTaxonomy;
   stories: Story[];
@@ -281,6 +282,30 @@ export const DEFAULT_HERO_BANNER: HeroBannerConfig = {
   imagePosition: "center 18%",
 };
 
+export const DEFAULT_HERO_SLIDES: [HeroBannerConfig, HeroBannerConfig, HeroBannerConfig] = [
+  DEFAULT_HERO_BANNER,
+  {
+    titleLine1: "Signature Modal",
+    titleLine2: "& Chiffon Drapes",
+    subtitle: "Breathable, lightweight fabrics crafted for effortless all-day grace",
+    ctaLabel: "Shop Modal & Chiffon",
+    ctaHref: "/shop?fabric=modal",
+    imageSrc: photos.sand.src,
+    imageAlt: photos.sand.alt,
+    imagePosition: photos.sand.position || "center 20%",
+  },
+  {
+    titleLine1: "Limited Time",
+    titleLine2: "Flash Sale Edit",
+    subtitle: "Exclusive seasonal markdowns on signature hijabs & modest essentials",
+    ctaLabel: "Shop Flash Sale",
+    ctaHref: "#flash-sale",
+    imageSrc: photos.rose.src,
+    imageAlt: photos.rose.alt,
+    imagePosition: photos.rose.position || "center 18%",
+  },
+];
+
 export const DEFAULT_FLASH_SALE: FlashSaleConfig = {
   enabled: true,
   endsAt: null,
@@ -320,6 +345,7 @@ const DEFAULT_SETTINGS: AdminSettingsRecord = {
     tiktok: "",
   },
   heroBanner: DEFAULT_HERO_BANNER,
+  heroSlides: [...DEFAULT_HERO_SLIDES],
   flashSale: DEFAULT_FLASH_SALE,
   taxonomy: DEFAULT_CATALOG_TAXONOMY,
   stories: defaultStories,
@@ -1030,6 +1056,10 @@ export async function getHomepageCollections() {
   return {
     allProducts: products,
     heroBanner: settings.heroBanner ?? DEFAULT_HERO_BANNER,
+    heroSlides:
+      Array.isArray(settings.heroSlides) && settings.heroSlides.length > 0
+        ? settings.heroSlides
+        : DEFAULT_HERO_SLIDES,
     flashSale: settings.flashSale ?? DEFAULT_FLASH_SALE,
     homepageStories:
       Array.isArray(settings.stories) && settings.stories.length > 0
@@ -1074,6 +1104,11 @@ function collectSettingsMediaUrls(settings?: AdminSettingsRecord | null): string
   const urls = new Set<string>();
   if (settings.heroBanner?.imageSrc) {
     urls.add(settings.heroBanner.imageSrc);
+  }
+  for (const slide of settings.heroSlides ?? []) {
+    if (slide?.imageSrc) {
+      urls.add(slide.imageSrc);
+    }
   }
   for (const story of settings.stories ?? []) {
     if (story.videoSrc) urls.add(story.videoSrc);
@@ -2169,6 +2204,34 @@ function normalizeStories(raw?: Story[] | null): Story[] {
     });
 }
 
+function normalizeHeroSlides(
+  rawSlides?: HeroBannerConfig[] | null,
+  primaryBanner?: HeroBannerConfig | null,
+): HeroBannerConfig[] {
+  const baseSlides = [
+    DEFAULT_HERO_SLIDES[0],
+    DEFAULT_HERO_SLIDES[1],
+    DEFAULT_HERO_SLIDES[2],
+  ];
+  const inputSlides = Array.isArray(rawSlides) ? rawSlides : [];
+  return baseSlides.map((fallback, idx) => {
+    const candidate =
+      idx === 0
+        ? (inputSlides[0] ?? primaryBanner ?? fallback)
+        : (inputSlides[idx] ?? fallback);
+    return {
+      titleLine1: candidate?.titleLine1?.trim() || fallback.titleLine1,
+      titleLine2: candidate?.titleLine2?.trim() || fallback.titleLine2,
+      subtitle: candidate?.subtitle?.trim() || fallback.subtitle,
+      ctaLabel: candidate?.ctaLabel?.trim() || fallback.ctaLabel,
+      ctaHref: candidate?.ctaHref?.trim() || fallback.ctaHref,
+      imageSrc: candidate?.imageSrc?.trim() || fallback.imageSrc,
+      imageAlt: candidate?.imageAlt?.trim() || fallback.imageAlt,
+      imagePosition: candidate?.imagePosition?.trim() || fallback.imagePosition,
+    };
+  });
+}
+
 async function fetchStoreSettingsFromSource(): Promise<AdminSettingsRecord> {
   const local = await readLocalStore();
   const config = getBackendConfig();
@@ -2186,6 +2249,15 @@ async function fetchStoreSettingsFromSource(): Promise<AdminSettingsRecord> {
         const rows = (await res.json()) as Array<{ description?: string }>;
         if (rows[0]?.description) {
           const parsed = JSON.parse(rows[0].description) as Partial<AdminSettingsRecord>;
+          const mergedPrimaryBanner: HeroBannerConfig = {
+            ...DEFAULT_HERO_BANNER,
+            ...(local.settings.heroBanner ?? {}),
+            ...(parsed.heroBanner ?? {}),
+          };
+          const normalizedSlides = normalizeHeroSlides(
+            parsed.heroSlides ?? local.settings.heroSlides,
+            mergedPrimaryBanner,
+          );
           return {
             ...DEFAULT_SETTINGS,
             ...local.settings,
@@ -2215,11 +2287,8 @@ async function fetchStoreSettingsFromSource(): Promise<AdminSettingsRecord> {
               ...(local.settings.socialLinks ?? {}),
               ...(parsed.socialLinks ?? {}),
             },
-            heroBanner: {
-              ...DEFAULT_HERO_BANNER,
-              ...(local.settings.heroBanner ?? {}),
-              ...(parsed.heroBanner ?? {}),
-            },
+            heroBanner: normalizedSlides[0],
+            heroSlides: normalizedSlides,
             flashSale: {
               ...DEFAULT_FLASH_SALE,
               ...(local.settings.flashSale ?? {}),
@@ -2235,6 +2304,15 @@ async function fetchStoreSettingsFromSource(): Promise<AdminSettingsRecord> {
     }
   }
 
+  const localPrimaryBanner: HeroBannerConfig = {
+    ...DEFAULT_HERO_BANNER,
+    ...(local.settings.heroBanner ?? {}),
+  };
+  const localNormalizedSlides = normalizeHeroSlides(
+    local.settings.heroSlides,
+    localPrimaryBanner,
+  );
+
   return {
     ...DEFAULT_SETTINGS,
     ...local.settings,
@@ -2245,10 +2323,8 @@ async function fetchStoreSettingsFromSource(): Promise<AdminSettingsRecord> {
       ...DEFAULT_SETTINGS.socialLinks,
       ...(local.settings.socialLinks ?? {}),
     },
-    heroBanner: {
-      ...DEFAULT_HERO_BANNER,
-      ...(local.settings.heroBanner ?? {}),
-    },
+    heroBanner: localNormalizedSlides[0],
+    heroSlides: localNormalizedSlides,
     flashSale: {
       ...DEFAULT_FLASH_SALE,
       ...(local.settings.flashSale ?? {}),
@@ -2286,6 +2362,21 @@ export async function updateStoreSettings(
   const local = await readLocalStore();
   const currentSettings = await getStoreSettings();
   const previousSettingsMediaUrls = collectSettingsMediaUrls(currentSettings);
+  const patchedPrimaryBanner: HeroBannerConfig = {
+    ...DEFAULT_HERO_BANNER,
+    ...(currentSettings.heroBanner ?? {}),
+    ...(patch.heroBanner ?? {}),
+  };
+  const nextHeroSlides = normalizeHeroSlides(
+    patch.heroSlides ??
+      (patch.heroBanner
+        ? [
+            patchedPrimaryBanner,
+            ...(currentSettings.heroSlides?.slice(1) ?? DEFAULT_HERO_SLIDES.slice(1)),
+          ]
+        : currentSettings.heroSlides),
+    patchedPrimaryBanner,
+  );
   const nextSettings: AdminSettingsRecord = {
     ...currentSettings,
     ...patch,
@@ -2322,11 +2413,8 @@ export async function updateStoreSettings(
           ? null
           : currentSettings.monthlySalesTarget
         : Math.max(0, Number(patch.monthlySalesTarget)),
-    heroBanner: {
-      ...DEFAULT_HERO_BANNER,
-      ...(currentSettings.heroBanner ?? {}),
-      ...(patch.heroBanner ?? {}),
-    },
+    heroBanner: nextHeroSlides[0],
+    heroSlides: nextHeroSlides,
     flashSale: {
       ...DEFAULT_FLASH_SALE,
       ...(currentSettings.flashSale ?? {}),
@@ -2371,8 +2459,8 @@ export async function updateStoreSettings(
       ? "Homepage Stories updated"
       : patch.taxonomy
         ? "Catalog categories, fabrics & colours updated"
-        : patch.heroBanner
-          ? "Homepage Hero Banner & Settings updated"
+        : patch.heroBanner || patch.heroSlides
+          ? "Homepage Hero Carousel (3 Slides) updated"
           : patch.flashSale
             ? "Flash Sale timer & expiry settings updated"
             : "Store settings updated",
@@ -2380,8 +2468,8 @@ export async function updateStoreSettings(
       ? `${nextSettings.stories.length} active stories on Homepage`
       : patch.taxonomy
         ? `${nextSettings.taxonomy.categories.length} categories · ${nextSettings.taxonomy.fabrics.length} fabrics · ${nextSettings.taxonomy.colours.length} colours`
-        : patch.heroBanner
-          ? `Banner: "${nextSettings.heroBanner.titleLine1} ${nextSettings.heroBanner.titleLine2}" — ${nextSettings.heroBanner.subtitle}`
+        : patch.heroBanner || patch.heroSlides
+          ? `Slide 1: "${nextSettings.heroBanner.titleLine1} ${nextSettings.heroBanner.titleLine2}" (+2 more carousel slides)`
           : patch.flashSale
             ? `Flash Sale ${nextSettings.flashSale.enabled ? "Enabled" : "Disabled"} · Action on expiry: ${nextSettings.flashSale.expiredBehavior}`
             : `Shipping: Inside Dhaka ৳${nextSettings.insideDhakaShippingFee}, Outside ৳${nextSettings.outsideDhakaShippingFee} · Low stock threshold: ${nextSettings.lowStockThreshold}`,

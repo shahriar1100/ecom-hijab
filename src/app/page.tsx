@@ -12,6 +12,7 @@ import { getHomepageCollections } from "@/lib/server/store-repository";
 export default async function HomePage() {
   const {
     heroBanner,
+    heroSlides,
     flashSale,
     homepageStories,
     homepageCategories,
@@ -26,7 +27,7 @@ export default async function HomePage() {
     <div id="home">
       <SiteHeader />
       <main id="main-content" className="page-container homepage">
-        <HeroBanner banner={heroBanner} />
+        <HeroBanner banner={heroBanner} slides={heroSlides} />
         <StoriesSection stories={homepageStories} />
         <CategoriesSection categories={homepageCategories} />
         <TopProductsSection products={topProducts} />

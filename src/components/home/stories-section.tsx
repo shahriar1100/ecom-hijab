@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, ExternalLink, Play, Volume2, VolumeX, X } from "lucide-react";
+import { AnimatePresence, LazyMotion, domAnimation, m, useReducedMotion } from "framer-motion";
 import { stories as defaultStories } from "@/data/store";
 import type { Story } from "@/types/store";
 import { HorizontalSlider } from "./horizontal-slider";
@@ -30,6 +31,7 @@ export function StoriesSection({ stories = defaultStories }: StoriesSectionProps
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [hoveredStoryId, setHoveredStoryId] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(false);
+  const shouldReduceMotion = useReducedMotion();
 
   const activeStory =
     activeIndex !== null && activeIndex >= 0 && activeIndex < stories.length
@@ -159,153 +161,167 @@ export function StoriesSection({ stories = defaultStories }: StoriesSectionProps
         })}
       </HorizontalSlider>
 
-      {activeStory && activeIndex !== null && (
-        <div
-          className="story-modal-backdrop"
-          role="dialog"
-          aria-modal="true"
-          aria-label={`${activeStory.label} video story`}
-          onClick={closeStoryModal}
-        >
-          <div
-            className="story-modal-frame"
-            onClick={(event) => event.stopPropagation()}
-          >
-            {/* Story Progress Segments */}
-            <div className="story-modal-progress" aria-hidden="true">
-              {stories.map((item, idx) => (
-                <span
-                  key={item.id}
-                  className={`story-modal-progress-bar ${
-                    idx < activeIndex
-                      ? "is-viewed"
-                      : idx === activeIndex
-                        ? "is-active"
-                        : ""
-                  }`}
-                />
-              ))}
-            </div>
-
-            {/* Top Header: Avatar + Title + Mute + Cross (X) Close Button */}
-            <div className="story-modal-header">
-              <div className="story-modal-author">
-                <span className="story-modal-avatar">
-                  <Image
-                    src={activeStory.avatar.src}
-                    alt={activeStory.label}
-                    width={38}
-                    height={38}
-                    unoptimized={activeStory.avatar.src.startsWith("http")}
-                  />
-                </span>
-                <div className="story-modal-meta">
-                  <strong>{activeStory.label}</strong>
-                  <span>
-                    {activeStory.videoSrc?.trim()
-                      ? "NOOR Video Reel"
-                      : "NOOR Story Highlight"}
-                  </span>
-                </div>
-              </div>
-
-              <div className="story-modal-actions">
-                {activeStory.videoSrc?.trim() && (
-                  <button
-                    type="button"
-                    className="story-modal-icon-btn"
-                    onClick={() => setIsMuted((prev) => !prev)}
-                    aria-label={isMuted ? "Unmute story video" : "Mute story video"}
-                    title={isMuted ? "Unmute" : "Mute"}
-                  >
-                    {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
-                  </button>
-                )}
-                <button
-                  type="button"
-                  className="story-modal-close"
-                  onClick={closeStoryModal}
-                  aria-label="Close story video"
-                  title="Close story"
-                >
-                  <X size={22} />
-                </button>
-              </div>
-            </div>
-
-            {/* Main Video / Reel Stage */}
-            <div className="story-modal-stage">
-              {activeStory.videoSrc?.trim() ? (
-                <video
-                  key={activeStory.id}
-                  src={getOptimizedVideoUrl(activeStory.videoSrc)}
-                  poster={activeStory.photo.src}
-                  className="story-modal-video"
-                  autoPlay
-                  controls
-                  playsInline
-                  loop
-                  muted={isMuted}
-                  onEnded={showNextStory}
-                />
-              ) : (
-                <div className="story-modal-reel-fallback">
-                  <Image
-                    src={activeStory.photo.src}
-                    alt={activeStory.photo.alt || activeStory.label}
-                    fill
-                    sizes="(min-width: 768px) 440px, 94vw"
-                    className="story-modal-reel-image"
-                    style={{ objectPosition: activeStory.photo.position }}
-                    unoptimized={activeStory.photo.src.startsWith("http")}
-                  />
-                  <div className="story-modal-reel-overlay" />
-                </div>
-              )}
-
-              {/* Previous / Next Story Side Controls */}
-              {stories.length > 1 && (
-                <>
-                  <button
-                    type="button"
-                    className="story-modal-nav story-modal-nav-prev"
-                    onClick={showPrevStory}
-                    aria-label="Previous story"
-                  >
-                    <ChevronLeft size={22} />
-                  </button>
-                  <button
-                    type="button"
-                    className="story-modal-nav story-modal-nav-next"
-                    onClick={showNextStory}
-                    aria-label="Next story"
-                  >
-                    <ChevronRight size={22} />
-                  </button>
-                </>
-              )}
-            </div>
-
-            {/* Bottom Footer / CTA inside Modal */}
-            <div className="story-modal-footer">
-              <div className="story-modal-caption-text">
-                <strong>{activeStory.label}</strong>
-                <span>
-                  {activeIndex + 1} of {stories.length}
-                </span>
-              </div>
-              <Link
-                href={activeStory.href?.trim() || "/shop"}
-                className="story-modal-cta"
-                onClick={closeStoryModal}
+      <LazyMotion features={domAnimation}>
+        <AnimatePresence>
+          {activeStory && activeIndex !== null && (
+            <m.div
+              key="story-modal-backdrop"
+              className="story-modal-backdrop"
+              role="dialog"
+              aria-modal="true"
+              aria-label={`${activeStory.label} video story`}
+              onClick={closeStoryModal}
+              initial={shouldReduceMotion ? false : { opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.22, ease: "easeOut" }}
+            >
+              <m.div
+                key={`story-modal-frame-${activeStory.id}`}
+                className="story-modal-frame"
+                onClick={(event) => event.stopPropagation()}
+                initial={shouldReduceMotion ? false : { opacity: 0, scale: 0.94, y: 16 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.96, y: 10 }}
+                transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
               >
-                <span>Explore Collection</span>
-                <ExternalLink size={14} />
-              </Link>
-            </div>
-          </div>
-        </div>
-      )}
+                {/* Story Progress Segments */}
+                <div className="story-modal-progress" aria-hidden="true">
+                  {stories.map((item, idx) => (
+                    <span
+                      key={item.id}
+                      className={`story-modal-progress-bar ${
+                        idx < activeIndex
+                          ? "is-viewed"
+                          : idx === activeIndex
+                            ? "is-active"
+                            : ""
+                      }`}
+                    />
+                  ))}
+                </div>
+
+                {/* Top Header: Avatar + Title + Mute + Cross (X) Close Button */}
+                <div className="story-modal-header">
+                  <div className="story-modal-author">
+                    <span className="story-modal-avatar">
+                      <Image
+                        src={activeStory.avatar.src}
+                        alt={activeStory.label}
+                        width={38}
+                        height={38}
+                        unoptimized={activeStory.avatar.src.startsWith("http")}
+                      />
+                    </span>
+                    <div className="story-modal-meta">
+                      <strong>{activeStory.label}</strong>
+                      <span>
+                        {activeStory.videoSrc?.trim()
+                          ? "NOOR Video Reel"
+                          : "NOOR Story Highlight"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="story-modal-actions">
+                    {activeStory.videoSrc?.trim() && (
+                      <button
+                        type="button"
+                        className="story-modal-icon-btn"
+                        onClick={() => setIsMuted((prev) => !prev)}
+                        aria-label={isMuted ? "Unmute story video" : "Mute story video"}
+                        title={isMuted ? "Unmute" : "Mute"}
+                      >
+                        {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="story-modal-close"
+                      onClick={closeStoryModal}
+                      aria-label="Close story video"
+                      title="Close story"
+                    >
+                      <X size={22} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Main Video / Reel Stage */}
+                <div className="story-modal-stage">
+                  {activeStory.videoSrc?.trim() ? (
+                    <video
+                      key={activeStory.id}
+                      src={getOptimizedVideoUrl(activeStory.videoSrc)}
+                      poster={activeStory.photo.src}
+                      className="story-modal-video"
+                      autoPlay
+                      controls
+                      playsInline
+                      loop
+                      muted={isMuted}
+                      onEnded={showNextStory}
+                    />
+                  ) : (
+                    <div className="story-modal-reel-fallback">
+                      <Image
+                        src={activeStory.photo.src}
+                        alt={activeStory.photo.alt || activeStory.label}
+                        fill
+                        sizes="(min-width: 768px) 440px, 94vw"
+                        className="story-modal-reel-image"
+                        style={{ objectPosition: activeStory.photo.position }}
+                        unoptimized={activeStory.photo.src.startsWith("http")}
+                      />
+                      <div className="story-modal-reel-overlay" />
+                    </div>
+                  )}
+
+                  {/* Previous / Next Story Side Controls */}
+                  {stories.length > 1 && (
+                    <>
+                      <button
+                        type="button"
+                        className="story-modal-nav story-modal-nav-prev"
+                        onClick={showPrevStory}
+                        aria-label="Previous story"
+                      >
+                        <ChevronLeft size={22} />
+                      </button>
+                      <button
+                        type="button"
+                        className="story-modal-nav story-modal-nav-next"
+                        onClick={showNextStory}
+                        aria-label="Next story"
+                      >
+                        <ChevronRight size={22} />
+                      </button>
+                    </>
+                  )}
+                </div>
+
+                {/* Bottom Footer / CTA inside Modal */}
+                <div className="story-modal-footer">
+                  <div className="story-modal-caption-text">
+                    <strong>{activeStory.label}</strong>
+                    <span>
+                      {activeIndex + 1} of {stories.length}
+                    </span>
+                  </div>
+                  <Link
+                    href={activeStory.href?.trim() || "/shop"}
+                    className="story-modal-cta"
+                    onClick={closeStoryModal}
+                  >
+                    <span>Explore Collection</span>
+                    <ExternalLink size={14} />
+                  </Link>
+                </div>
+              </m.div>
+            </m.div>
+          )}
+        </AnimatePresence>
+      </LazyMotion>
     </section>
   );
 }

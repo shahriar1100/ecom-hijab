@@ -78,6 +78,7 @@ import type {
   AdminReviewRecord,
   ContactMessageRecord,
   CustomerAccountRecord,
+  HeroBannerConfig,
   ProductSectionKey,
   ProductStatus,
 } from "@/lib/server/store-repository";
@@ -217,6 +218,61 @@ function computePresetDatetimeLocal(hoursFromNow: number): string {
   target.setTime(target.getTime() + hoursFromNow * 3600 * 1000);
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${target.getFullYear()}-${pad(target.getMonth() + 1)}-${pad(target.getDate())}T${pad(target.getHours())}:${pad(target.getMinutes())}`;
+}
+
+const DEFAULT_ADMIN_HERO_SLIDES: [HeroBannerConfig, HeroBannerConfig, HeroBannerConfig] = [
+  {
+    titleLine1: "Everyday",
+    titleLine2: "Elegance",
+    subtitle: "Premium hijabs crafted for comfort and confidence",
+    ctaLabel: "Explore Collection",
+    ctaHref: "#new-items",
+    imageSrc: photos.hero.src,
+    imageAlt: photos.hero.alt,
+    imagePosition: photos.hero.position || "74% 18%",
+  },
+  {
+    titleLine1: "Signature Modal",
+    titleLine2: "& Chiffon Drapes",
+    subtitle: "Breathable, lightweight fabrics crafted for effortless all-day grace",
+    ctaLabel: "Shop Modal & Chiffon",
+    ctaHref: "/shop?fabric=modal",
+    imageSrc: photos.sand.src,
+    imageAlt: photos.sand.alt,
+    imagePosition: photos.sand.position || "center 20%",
+  },
+  {
+    titleLine1: "Limited Time",
+    titleLine2: "Flash Sale Edit",
+    subtitle: "Exclusive seasonal markdowns on signature hijabs & modest essentials",
+    ctaLabel: "Shop Flash Sale",
+    ctaHref: "#flash-sale",
+    imageSrc: photos.rose.src,
+    imageAlt: photos.rose.alt,
+    imagePosition: photos.rose.position || "center 18%",
+  },
+];
+
+function buildHeroSlidesState(
+  rawSlides?: HeroBannerConfig[] | null,
+  primaryBanner?: HeroBannerConfig | null,
+): [HeroBannerConfig, HeroBannerConfig, HeroBannerConfig] {
+  const input = Array.isArray(rawSlides) ? rawSlides : [];
+  return [0, 1, 2].map((idx) => {
+    const fallback = DEFAULT_ADMIN_HERO_SLIDES[idx];
+    const candidate =
+      idx === 0 ? (input[0] ?? primaryBanner ?? fallback) : (input[idx] ?? fallback);
+    return {
+      titleLine1: candidate?.titleLine1 || fallback.titleLine1,
+      titleLine2: candidate?.titleLine2 || fallback.titleLine2,
+      subtitle: candidate?.subtitle || fallback.subtitle,
+      ctaLabel: candidate?.ctaLabel || fallback.ctaLabel,
+      ctaHref: candidate?.ctaHref || fallback.ctaHref,
+      imageSrc: candidate?.imageSrc || fallback.imageSrc,
+      imageAlt: candidate?.imageAlt || fallback.imageAlt,
+      imagePosition: candidate?.imagePosition || fallback.imagePosition,
+    };
+  }) as [HeroBannerConfig, HeroBannerConfig, HeroBannerConfig];
 }
 
 export function AdminDashboard({
@@ -587,32 +643,44 @@ export function AdminDashboard({
   );
   const [savingSettings, setSavingSettings] = useState(false);
 
-  // Hero Banner Editor State
-  const [bannerTitle1, setBannerTitle1] = useState(
-    analytics.settings.heroBanner?.titleLine1 || "Everyday",
+  // Hero Banner Carousel Editor State (3 Slides)
+  const [heroSlides, setHeroSlides] = useState<
+    [HeroBannerConfig, HeroBannerConfig, HeroBannerConfig]
+  >(() =>
+    buildHeroSlidesState(analytics.settings.heroSlides, analytics.settings.heroBanner),
   );
-  const [bannerTitle2, setBannerTitle2] = useState(
-    analytics.settings.heroBanner?.titleLine2 || "Elegance",
+  const [activeBannerSlideIdx, setActiveBannerSlideIdx] = useState<0 | 1 | 2>(0);
+  const currentBannerSlide = heroSlides[activeBannerSlideIdx] ?? heroSlides[0];
+  const bannerTitle1 = currentBannerSlide.titleLine1;
+  const bannerTitle2 = currentBannerSlide.titleLine2;
+  const bannerSubtitle = currentBannerSlide.subtitle;
+  const bannerCtaLabel = currentBannerSlide.ctaLabel;
+  const bannerCtaHref = currentBannerSlide.ctaHref;
+  const bannerImageSrc = currentBannerSlide.imageSrc;
+  const bannerImageAlt = currentBannerSlide.imageAlt;
+  const bannerImagePosition = currentBannerSlide.imagePosition;
+
+  const updateCurrentBannerSlide = useCallback(
+    (patch: Partial<HeroBannerConfig>) => {
+      setHeroSlides(
+        (prev) =>
+          prev.map((slide, idx) =>
+            idx === activeBannerSlideIdx ? { ...slide, ...patch } : slide,
+          ) as [HeroBannerConfig, HeroBannerConfig, HeroBannerConfig],
+      );
+    },
+    [activeBannerSlideIdx],
   );
-  const [bannerSubtitle, setBannerSubtitle] = useState(
-    analytics.settings.heroBanner?.subtitle ||
-      "Premium hijabs crafted for comfort and confidence",
-  );
-  const [bannerCtaLabel, setBannerCtaLabel] = useState(
-    analytics.settings.heroBanner?.ctaLabel || "Explore Collection",
-  );
-  const [bannerCtaHref, setBannerCtaHref] = useState(
-    analytics.settings.heroBanner?.ctaHref || "#new-items",
-  );
-  const [bannerImageSrc, setBannerImageSrc] = useState(
-    analytics.settings.heroBanner?.imageSrc || photos.hero.src,
-  );
-  const [bannerImageAlt, setBannerImageAlt] = useState(
-    analytics.settings.heroBanner?.imageAlt || photos.hero.alt,
-  );
-  const [bannerImagePosition, setBannerImagePosition] = useState(
-    analytics.settings.heroBanner?.imagePosition || photos.hero.position || "74% 18%",
-  );
+  const setBannerTitle1 = (v: string) => updateCurrentBannerSlide({ titleLine1: v });
+  const setBannerTitle2 = (v: string) => updateCurrentBannerSlide({ titleLine2: v });
+  const setBannerSubtitle = (v: string) => updateCurrentBannerSlide({ subtitle: v });
+  const setBannerCtaLabel = (v: string) => updateCurrentBannerSlide({ ctaLabel: v });
+  const setBannerCtaHref = (v: string) => updateCurrentBannerSlide({ ctaHref: v });
+  const setBannerImageSrc = (v: string) => updateCurrentBannerSlide({ imageSrc: v });
+  const setBannerImageAlt = (v: string) => updateCurrentBannerSlide({ imageAlt: v });
+  const setBannerImagePosition = (v: string) =>
+    updateCurrentBannerSlide({ imagePosition: v });
+
   const [uploadingBannerImage, setUploadingBannerImage] = useState(false);
   const [savingBanner, setSavingBanner] = useState(false);
 
@@ -717,15 +785,8 @@ export function AdminDashboard({
             setYoutubeUrlInput(s.socialLinks.youtube ?? "");
             setTiktokUrlInput(s.socialLinks.tiktok ?? "");
           }
-          if (s.heroBanner) {
-            setBannerTitle1(s.heroBanner.titleLine1);
-            setBannerTitle2(s.heroBanner.titleLine2);
-            setBannerSubtitle(s.heroBanner.subtitle);
-            setBannerCtaLabel(s.heroBanner.ctaLabel);
-            setBannerCtaHref(s.heroBanner.ctaHref);
-            setBannerImageSrc(s.heroBanner.imageSrc);
-            setBannerImageAlt(s.heroBanner.imageAlt);
-            setBannerImagePosition(s.heroBanner.imagePosition);
+          if (s.heroSlides || s.heroBanner) {
+            setHeroSlides(buildHeroSlidesState(s.heroSlides, s.heroBanner));
           }
           if (s.flashSale) {
             setFlashSaleEnabled(s.flashSale.enabled);
@@ -1331,16 +1392,18 @@ export function AdminDashboard({
         setFeedback(`Banner upload error: ${data.error || "Failed to upload banner image"}`);
         return;
       }
-      setBannerImageSrc(data.url);
-      if (!bannerImageAlt || bannerImageAlt === photos.hero.alt) {
-        setBannerImageAlt(
-          `${bannerTitle1} ${bannerTitle2} — NOOR Hero Banner`.trim(),
-        );
-      }
+      updateCurrentBannerSlide({
+        imageSrc: data.url,
+        imageAlt:
+          !bannerImageAlt ||
+          bannerImageAlt === DEFAULT_ADMIN_HERO_SLIDES[activeBannerSlideIdx].imageAlt
+            ? `${bannerTitle1} ${bannerTitle2} — NOOR Hero Slide ${activeBannerSlideIdx + 1}`.trim()
+            : bannerImageAlt,
+      });
       setFeedback(
         data.mode === "cloudinary"
-          ? "Banner photo uploaded to Cloudinary CDN! Click 'Save Hero Banner' to publish."
-          : "Banner photo uploaded to local storage! Click 'Save Hero Banner' to publish.",
+          ? `Slide ${activeBannerSlideIdx + 1} photo uploaded to Cloudinary CDN! Click 'Save & Publish All 3 Slides' to publish.`
+          : `Slide ${activeBannerSlideIdx + 1} photo uploaded to local storage! Click 'Save & Publish All 3 Slides' to publish.`,
       );
     } catch {
       setFeedback("Failed to upload banner image file.");
@@ -1355,47 +1418,60 @@ export function AdminDashboard({
     setSavingBanner(true);
     setFeedback("");
     try {
+      const cleanedSlides = heroSlides.map((slide, idx) => {
+        const fallback = DEFAULT_ADMIN_HERO_SLIDES[idx];
+        return {
+          titleLine1: slide.titleLine1.trim() || fallback.titleLine1,
+          titleLine2: slide.titleLine2.trim() || fallback.titleLine2,
+          subtitle: slide.subtitle.trim() || fallback.subtitle,
+          ctaLabel: slide.ctaLabel.trim() || fallback.ctaLabel,
+          ctaHref: slide.ctaHref.trim() || fallback.ctaHref,
+          imageSrc: slide.imageSrc.trim() || fallback.imageSrc,
+          imageAlt: slide.imageAlt.trim() || fallback.imageAlt,
+          imagePosition: slide.imagePosition.trim() || fallback.imagePosition,
+        };
+      }) as [HeroBannerConfig, HeroBannerConfig, HeroBannerConfig];
+
       const res = await fetch("/api/admin/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          heroBanner: {
-            titleLine1: bannerTitle1.trim() || "Everyday",
-            titleLine2: bannerTitle2.trim() || "Elegance",
-            subtitle:
-              bannerSubtitle.trim() ||
-              "Premium hijabs crafted for comfort and confidence",
-            ctaLabel: bannerCtaLabel.trim() || "Explore Collection",
-            ctaHref: bannerCtaHref.trim() || "#new-items",
-            imageSrc: bannerImageSrc.trim() || photos.hero.src,
-            imageAlt: bannerImageAlt.trim() || photos.hero.alt,
-            imagePosition: bannerImagePosition.trim() || "74% 18%",
-          },
+          heroBanner: cleanedSlides[0],
+          heroSlides: cleanedSlides,
         }),
       });
       if (res.ok) {
         await fetchAnalyticsData();
-        setFeedback("Homepage Hero Banner updated and published live on storefront!");
+        setFeedback(
+          "All 3 Homepage Hero Carousel Slides updated and published live on storefront!",
+        );
       } else {
-        setFeedback("Failed to save Hero Banner settings.");
+        setFeedback("Failed to save Hero Carousel settings.");
       }
     } catch {
-      setFeedback("Network error while saving Hero Banner.");
+      setFeedback("Network error while saving Hero Carousel.");
     } finally {
       setSavingBanner(false);
     }
   }
 
   function handleResetHeroBanner() {
-    setBannerTitle1("Everyday");
-    setBannerTitle2("Elegance");
-    setBannerSubtitle("Premium hijabs crafted for comfort and confidence");
-    setBannerCtaLabel("Explore Collection");
-    setBannerCtaHref("#new-items");
-    setBannerImageSrc(photos.hero.src);
-    setBannerImageAlt(photos.hero.alt);
-    setBannerImagePosition(photos.hero.position || "74% 18%");
-    setFeedback("Banner fields reset to NOOR defaults. Click 'Save Hero Banner' to apply.");
+    const def = DEFAULT_ADMIN_HERO_SLIDES[activeBannerSlideIdx];
+    updateCurrentBannerSlide({ ...def });
+    setFeedback(
+      `Slide ${activeBannerSlideIdx + 1} reset to NOOR default. Click 'Save & Publish All 3 Slides' to apply.`,
+    );
+  }
+
+  function handleResetAllHeroSlides() {
+    setHeroSlides([
+      { ...DEFAULT_ADMIN_HERO_SLIDES[0] },
+      { ...DEFAULT_ADMIN_HERO_SLIDES[1] },
+      { ...DEFAULT_ADMIN_HERO_SLIDES[2] },
+    ]);
+    setFeedback(
+      "All 3 Hero Slides reset to NOOR defaults. Click 'Save & Publish All 3 Slides' to apply.",
+    );
   }
 
   function applyFlashSalePresetHours(hoursFromNow: number | null) {
@@ -4795,25 +4871,112 @@ export function AdminDashboard({
                 <div className="adm-panel">
                   <div className="adm-panel-head">
                     <div>
-                      <h3>Homepage Hero Banner Editor</h3>
+                      <h3>Homepage Hero Carousel Editor (3 Slides)</h3>
                       <p className="adm-panel-sub">
-                        Customize the main homepage banner headline, subtitle, CTA button, and
-                        photograph
+                        Customize all 3 auto-sliding hero banners — headline, subtitle, CTA button,
+                        and photograph for each slide
                       </p>
                     </div>
-                    <button
-                      type="button"
-                      className="adm-btn adm-btn-sm adm-btn-secondary"
-                      onClick={handleResetHeroBanner}
-                    >
-                      Reset Default
-                    </button>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      <button
+                        type="button"
+                        className="adm-btn adm-btn-sm adm-btn-secondary"
+                        onClick={handleResetHeroBanner}
+                      >
+                        Reset Slide {activeBannerSlideIdx + 1}
+                      </button>
+                      <button
+                        type="button"
+                        className="adm-btn adm-btn-sm adm-btn-secondary"
+                        onClick={handleResetAllHeroSlides}
+                      >
+                        Reset All 3
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 3-Slide Selector Tabs */}
+                  <div
+                    role="tablist"
+                    aria-label="Hero Carousel Slides"
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                      gap: 10,
+                      marginBottom: 16,
+                    }}
+                  >
+                    {([0, 1, 2] as const).map((slideIdx) => {
+                      const slideItem = heroSlides[slideIdx];
+                      const isActive = activeBannerSlideIdx === slideIdx;
+                      return (
+                        <button
+                          key={slideIdx}
+                          type="button"
+                          role="tab"
+                          aria-selected={isActive}
+                          onClick={() => setActiveBannerSlideIdx(slideIdx)}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 10,
+                            padding: "8px 10px",
+                            borderRadius: 12,
+                            border: isActive
+                              ? "2px solid var(--accent-strong)"
+                              : "1px solid var(--line)",
+                            background: isActive ? "var(--surface-soft)" : "var(--surface)",
+                            cursor: "pointer",
+                            textAlign: "left",
+                          }}
+                        >
+                          <span
+                            aria-hidden="true"
+                            style={{
+                              width: 38,
+                              height: 38,
+                              borderRadius: 8,
+                              backgroundImage: `url("${slideItem.imageSrc || photos.hero.src}")`,
+                              backgroundSize: "cover",
+                              backgroundPosition: slideItem.imagePosition || "center",
+                              border: "1px solid var(--line)",
+                              flexShrink: 0,
+                            }}
+                          />
+                          <span style={{ minWidth: 0, flex: 1 }}>
+                            <strong
+                              style={{
+                                display: "block",
+                                fontSize: 12,
+                                color: isActive ? "var(--accent-strong)" : "var(--ink)",
+                              }}
+                            >
+                              Slide {slideIdx + 1} {slideIdx === 0 ? "(Primary)" : ""}
+                            </strong>
+                            <span
+                              style={{
+                                display: "block",
+                                fontSize: 11,
+                                color: "var(--muted)",
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                              }}
+                            >
+                              {slideItem.titleLine1} {slideItem.titleLine2}
+                            </span>
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
 
                   <form className="adm-form-stack" onSubmit={handleSaveHeroBanner}>
                     <div className="adm-form-row-2">
                       <div className="adm-field">
-                        <label htmlFor="ban-title-1">Headline Line 1</label>
+                        <label htmlFor="ban-title-1">
+                          Slide {activeBannerSlideIdx + 1} — Headline Line 1
+                        </label>
                         <input
                           id="ban-title-1"
                           type="text"
@@ -4825,7 +4988,9 @@ export function AdminDashboard({
                         />
                       </div>
                       <div className="adm-field">
-                        <label htmlFor="ban-title-2">Headline Line 2</label>
+                        <label htmlFor="ban-title-2">
+                          Slide {activeBannerSlideIdx + 1} — Headline Line 2
+                        </label>
                         <input
                           id="ban-title-2"
                           type="text"
@@ -4839,7 +5004,9 @@ export function AdminDashboard({
                     </div>
 
                     <div className="adm-field">
-                      <label htmlFor="ban-subtitle">Banner Subtitle</label>
+                      <label htmlFor="ban-subtitle">
+                        Slide {activeBannerSlideIdx + 1} — Banner Subtitle
+                      </label>
                       <input
                         id="ban-subtitle"
                         type="text"
@@ -4879,7 +5046,9 @@ export function AdminDashboard({
                     </div>
 
                     <div className="adm-field">
-                      <label>Banner Photograph (Upload or Choose Studio Preset)</label>
+                      <label>
+                        Slide {activeBannerSlideIdx + 1} Photograph (Upload or Choose Studio Preset)
+                      </label>
                       <div
                         style={{
                           display: "flex",
@@ -4895,10 +5064,10 @@ export function AdminDashboard({
                         >
                           <CloudUpload size={14} />
                           {uploadingBannerImage
-                            ? "Uploading Banner..."
+                            ? `Uploading Slide ${activeBannerSlideIdx + 1}...`
                             : status.cloudinaryConfigured
-                              ? "Upload Banner (Cloudinary CDN)"
-                              : "Upload Banner File"}
+                              ? `Upload Slide ${activeBannerSlideIdx + 1} Photo (Cloudinary)`
+                              : `Upload Slide ${activeBannerSlideIdx + 1} Photo`}
                           <input
                             type="file"
                             accept="image/*"
@@ -4911,9 +5080,11 @@ export function AdminDashboard({
                           type="button"
                           className={`adm-chip ${bannerImageSrc === photos.hero.src ? "is-active" : ""}`}
                           onClick={() => {
-                            setBannerImageSrc(photos.hero.src);
-                            setBannerImageAlt(photos.hero.alt);
-                            setBannerImagePosition(photos.hero.position || "74% 18%");
+                            updateCurrentBannerSlide({
+                              imageSrc: photos.hero.src,
+                              imageAlt: photos.hero.alt,
+                              imagePosition: photos.hero.position || "74% 18%",
+                            });
                           }}
                         >
                           Hero Default
@@ -4924,9 +5095,11 @@ export function AdminDashboard({
                             type="button"
                             className={`adm-chip ${bannerImageSrc === preset.photo.src ? "is-active" : ""}`}
                             onClick={() => {
-                              setBannerImageSrc(preset.photo.src);
-                              setBannerImageAlt(preset.photo.alt);
-                              setBannerImagePosition("50% 25%");
+                              updateCurrentBannerSlide({
+                                imageSrc: preset.photo.src,
+                                imageAlt: preset.photo.alt,
+                                imagePosition: "50% 25%",
+                              });
                             }}
                           >
                             {preset.label}
@@ -4937,7 +5110,9 @@ export function AdminDashboard({
 
                     <div className="adm-form-row-2">
                       <div className="adm-field">
-                        <label htmlFor="ban-img-src">Banner Image URL / Path</label>
+                        <label htmlFor="ban-img-src">
+                          Slide {activeBannerSlideIdx + 1} Image URL / Path
+                        </label>
                         <input
                           id="ban-img-src"
                           type="text"
@@ -4961,7 +5136,9 @@ export function AdminDashboard({
                     </div>
 
                     <div className="adm-field">
-                      <label htmlFor="ban-img-alt">Image Alt Description (SEO &amp; Accessibility)</label>
+                      <label htmlFor="ban-img-alt">
+                        Image Alt Description (SEO &amp; Accessibility)
+                      </label>
                       <input
                         id="ban-img-alt"
                         type="text"
@@ -4977,7 +5154,9 @@ export function AdminDashboard({
                         className="adm-btn adm-btn-primary"
                         disabled={savingBanner}
                       >
-                        {savingBanner ? "Publishing Banner..." : "Save & Publish Hero Banner"}
+                        {savingBanner
+                          ? "Publishing All 3 Slides..."
+                          : "Save & Publish All 3 Hero Slides"}
                       </button>
                       <Link
                         href="/"
@@ -4994,12 +5173,13 @@ export function AdminDashboard({
                 <div className="adm-panel">
                   <div className="adm-panel-head">
                     <div>
-                      <h3>Live Hero Banner Preview</h3>
+                      <h3>Live Hero Carousel Preview (Slide {activeBannerSlideIdx + 1} of 3)</h3>
                       <p className="adm-panel-sub">
-                        Real-time preview of how the banner appears on the NOOR homepage
+                        Real-time preview of Slide {activeBannerSlideIdx + 1} — auto-cycles every
+                        4.8s on the storefront
                       </p>
                     </div>
-                    <span className="adm-status-pill is-success">Live Sync</span>
+                    <span className="adm-status-pill is-success">Auto-Carousel Ready</span>
                   </div>
 
                   <div
@@ -5083,10 +5263,49 @@ export function AdminDashboard({
                         {bannerCtaLabel || "Explore Collection"} →
                       </span>
                     </div>
+
+                    {/* Interactive Preview Dots */}
+                    <div
+                      style={{
+                        position: "absolute",
+                        bottom: 14,
+                        right: 18,
+                        zIndex: 3,
+                        display: "flex",
+                        gap: 6,
+                      }}
+                    >
+                      {([0, 1, 2] as const).map((idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setActiveBannerSlideIdx(idx)}
+                          title={`Preview Slide ${idx + 1}`}
+                          style={{
+                            width: activeBannerSlideIdx === idx ? 26 : 10,
+                            height: 10,
+                            borderRadius: 999,
+                            border: "none",
+                            background:
+                              activeBannerSlideIdx === idx
+                                ? "#d4a373"
+                                : "rgba(255,255,255,0.45)",
+                            cursor: "pointer",
+                            transition: "width 0.25s ease",
+                          }}
+                        />
+                      ))}
+                    </div>
                   </div>
 
                   <div style={{ marginTop: 18 }}>
                     <div className="adm-mini-stat-list">
+                      <div className="adm-mini-stat-row">
+                        <span>Editing Slide</span>
+                        <strong>
+                          Slide {activeBannerSlideIdx + 1} of 3 ({bannerTitle1} {bannerTitle2})
+                        </strong>
+                      </div>
                       <div className="adm-mini-stat-row">
                         <span>Target Destination</span>
                         <code>{bannerCtaHref || "#new-items"}</code>
