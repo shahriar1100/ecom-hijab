@@ -26,8 +26,7 @@ export function NavigationDrawer({ activePage, categories }: {
 
   function close() { dialog.current?.close(); }
 
-  useEffect(() => {
-    let active = true;
+  function refreshCategories() {
     fetch("/api/catalog", { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : null))
       .then(
@@ -40,7 +39,7 @@ export function NavigationDrawer({ activePage, categories }: {
             };
           } | null,
         ) => {
-          if (!active || !data?.ok || !data.taxonomy) return;
+          if (!data?.ok || !data.taxonomy) return;
           const customCats = (data.taxonomy.categories ?? [])
             .filter((c) => c.value !== "hijabs" && c.value !== "accessories")
             .map((c) => ({
@@ -71,9 +70,10 @@ export function NavigationDrawer({ activePage, categories }: {
       .catch(() => {
         // Keep static categories fallback
       });
-    return () => {
-      active = false;
-    };
+  }
+
+  useEffect(() => {
+    refreshCategories();
   }, []);
 
   useEffect(() => {
@@ -100,6 +100,7 @@ export function NavigationDrawer({ activePage, categories }: {
 
   return <>
     <button ref={trigger} type="button" className="icon-button menu-trigger" aria-label="Open menu" aria-haspopup="dialog" aria-controls="navigation-drawer" aria-expanded={open} onClick={() => {
+      refreshCategories();
       setCategoriesOpen(false);
       dialog.current?.showModal();
       setOpen(true);

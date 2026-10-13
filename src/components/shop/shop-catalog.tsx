@@ -36,20 +36,56 @@ export function ShopCatalog({
   products: CatalogProduct[];
   taxonomy?: CatalogTaxonomy;
 }) {
+  const [fetchedCatalog, setFetchedCatalog] = useState<{
+    products?: CatalogProduct[];
+    taxonomy?: CatalogTaxonomy;
+  } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function refreshCatalog() {
+      try {
+        const res = await fetch("/api/catalog", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          ok?: boolean;
+          products?: CatalogProduct[];
+          taxonomy?: CatalogTaxonomy;
+        };
+        if (cancelled || !data.ok) return;
+        setFetchedCatalog({
+          ...(Array.isArray(data.products) ? { products: data.products } : {}),
+          ...(data.taxonomy ? { taxonomy: data.taxonomy } : {}),
+        });
+      } catch {
+        // Keep current products and taxonomy on network error
+      }
+    }
+    void refreshCatalog();
+    window.addEventListener("focus", refreshCatalog);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("focus", refreshCatalog);
+    };
+  }, []);
+
+  const liveProducts = fetchedCatalog?.products ?? products;
+  const liveTaxonomy = fetchedCatalog?.taxonomy ?? taxonomy;
+
   // Also subscribe to Next navigation so header/category links refresh this page.
   const searchParams = useSearchParams();
   // Read the browser URL synchronously for controlled inputs and Back/Forward.
   // Waiting for a router transition can otherwise lose fast input characters.
   const queryString = useSyncExternalStore(subscribeToFilterURL, readFilterURL, () => searchParams.toString());
-  const filters = parseShopFilters(new URLSearchParams(queryString), taxonomy);
-  const matching = filterProducts(products, filters);
+  const filters = parseShopFilters(new URLSearchParams(queryString), liveTaxonomy);
+  const matching = filterProducts(liveProducts, filters);
   const selectedCount = filterCount(filters);
   const hasFilters = selectedCount > 0 || Boolean(filters.query.trim());
   const [draft, setDraft] = useState<ShopFilters>(emptyFilters);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const drawer = useRef<HTMLDialogElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
-  const draftCount = filterProducts(products, draft).length;
+  const draftCount = filterProducts(liveProducts, draft).length;
 
   // Next updates browser history after rendering route changes. Notify our URL
   // subscribers after that commit as well as after local filter interactions.
@@ -80,17 +116,17 @@ export function ShopCatalog({
     {
       key: "categories",
       label: "Category",
-      options: taxonomy?.categories?.length ? taxonomy.categories : categoryOptions,
+      options: liveTaxonomy?.categories?.length ? liveTaxonomy.categories : categoryOptions,
     },
     {
       key: "fabrics",
       label: "Fabric",
-      options: taxonomy?.fabrics?.length ? taxonomy.fabrics : fabricOptions,
+      options: liveTaxonomy?.fabrics?.length ? liveTaxonomy.fabrics : fabricOptions,
     },
     {
       key: "colours",
       label: "Colour",
-      options: taxonomy?.colours?.length ? taxonomy.colours : colourOptions,
+      options: liveTaxonomy?.colours?.length ? liveTaxonomy.colours : colourOptions,
     },
   ] as const;
 
@@ -117,7 +153,7 @@ export function ShopCatalog({
     </div>
 
     <div className="shop-layout">
-      <aside className="shop-sidebar" aria-label="Product filters"><div className="shop-sidebar-heading"><h2>Filters</h2><button type="button" className="shop-clear-link" disabled={!hasFilters} onClick={() => updateFilters(emptyFilters)}>Clear</button></div><FilterFields value={filters} onChange={updateFilters} prefix="sidebar" taxonomy={taxonomy} /></aside>
+      <aside className="shop-sidebar" aria-label="Product filters"><div className="shop-sidebar-heading"><h2>Filters</h2><button type="button" className="shop-clear-link" disabled={!hasFilters} onClick={() => updateFilters(emptyFilters)}>Clear</button></div><FilterFields value={filters} onChange={updateFilters} prefix="sidebar" taxonomy={liveTaxonomy} /></aside>
       <section className="shop-results" aria-labelledby="shop-products-heading"><h2 id="shop-products-heading" className="sr-only">Products</h2><ShopResults key={shopUrl(filters)} products={matching} onClear={() => updateFilters(emptyFilters)} /></section>
     </div>
 
@@ -130,7 +166,7 @@ export function ShopCatalog({
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
     }}>
       <div className="shop-drawer-shell"><div className="shop-drawer-heading"><div><h2 id="shop-filter-title">Find your favourites</h2><p id="shop-filter-description">Choose your filters, then apply.</p></div><button type="button" className="icon-button" aria-label="Close filters" onClick={closeDrawer}><X size={22} /></button></div>
-        <div className="shop-drawer-scroll"><FilterFields value={draft} onChange={setDraft} prefix="drawer" taxonomy={taxonomy} /></div>
+        <div className="shop-drawer-scroll"><FilterFields value={draft} onChange={setDraft} prefix="drawer" taxonomy={liveTaxonomy} /></div>
         <div className="shop-drawer-actions"><button type="button" className="shop-clear-button" onClick={() => setDraft({ ...emptyFilters, sort: draft.sort })}>Clear</button><button type="button" className="shop-primary-button" onClick={() => { updateFilters(draft); closeDrawer(); }}>Apply filters <span>({draftCount})</span></button></div>
       </div>
     </dialog>

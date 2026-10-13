@@ -9,6 +9,8 @@ import { ProductSection } from "@/components/home/product-section";
 import { FlashSaleSection } from "@/components/home/flash-sale-section";
 import { getHomepageCollections } from "@/lib/server/store-repository";
 
+export const dynamic = "force-dynamic";
+
 export default async function HomePage() {
   const {
     heroBanner,

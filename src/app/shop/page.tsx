@@ -9,6 +9,8 @@ import { ShopCatalog } from "@/components/shop/shop-catalog";
 import { getAllStoreProducts, getStoreSettings } from "@/lib/server/store-repository";
 import "./shop.css";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Shop the Collection | NOOR",
   description: "Find your everyday favourite. Explore NOOR hijabs and accessories by fabric, colour and price.",

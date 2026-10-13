@@ -1087,6 +1087,35 @@ export function AdminDashboard({
     setSavingProduct(true);
     setFeedback("");
 
+    let resolvedColour = colour;
+    const pendingColourLabel = newColourLabel.trim();
+    if (pendingColourLabel) {
+      const pendingColourValue = toSlugKey(pendingColourLabel);
+      if (pendingColourValue) {
+        resolvedColour = pendingColourValue;
+        const swatch = newColourSwatch.trim() || "#0f766e";
+        const existingIdx = taxonomy.colours.findIndex((c) => c.value === pendingColourValue);
+        const nextColours =
+          existingIdx >= 0
+            ? taxonomy.colours.map((c, idx) =>
+                idx === existingIdx ? { value: pendingColourValue, label: pendingColourLabel, swatch } : c,
+              )
+            : [...taxonomy.colours, { value: pendingColourValue, label: pendingColourLabel, swatch }];
+        setNewColourLabel("");
+        setColour(pendingColourValue);
+        setTaxonomy({ ...taxonomy, colours: nextColours });
+        try {
+          await fetch("/api/admin/settings", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ taxonomy: { ...taxonomy, colours: nextColours } }),
+          });
+        } catch {
+          // upsertStoreProduct also auto-registers custom colour
+        }
+      }
+    }
+
     const selectedCatMeta = taxonomy.categories.find((c) => c.value === category);
     const categoryUsesFabric = selectedCatMeta
       ? selectedCatMeta.hasFabric !== false
@@ -1103,7 +1132,7 @@ export function AdminDashboard({
       status: productStatus,
       category,
       fabric: !categoryUsesFabric || !fabric ? null : fabric,
-      colour,
+      colour: resolvedColour,
       stock: Number(stock) || 0,
       lowStockThreshold: Number(lowStockThreshold) || 5,
       material: material.trim(),

@@ -621,7 +621,7 @@ function normalizeOrderRecord(
   };
 }
 
-const MEMORY_CACHE_TTL_MS = 60_000;
+const MEMORY_CACHE_TTL_MS = 3_000;
 
 let cachedLocalStore: { data: LocalRuntimeStore; expiresAt: number } | null = null;
 let cachedSettings: { data: AdminSettingsRecord; expiresAt: number } | null = null;
@@ -745,6 +745,26 @@ function appendActivity(
   ].slice(0, 60);
 }
 
+const SAFE_DB_CATEGORIES = new Set(["hijabs", "accessories"]);
+const SAFE_DB_FABRICS = new Set(["modal", "chiffon", "jersey", "silk"]);
+const SAFE_DB_COLOURS = new Set([
+  "rose",
+  "olive",
+  "black",
+  "sand",
+  "mocha",
+  "mauve",
+  "burgundy",
+  "multi",
+  "gold",
+]);
+
+type ExtendedProductVariant = ProductVariant & {
+  customCategory?: string;
+  customFabric?: string | null;
+  customColour?: string;
+};
+
 function rowToProduct(row: SupabaseProductRow, index = 0): AdminProductRecord {
   const photo: Photo = {
     src: row.image_src,
@@ -752,11 +772,27 @@ function rowToProduct(row: SupabaseProductRow, index = 0): AdminProductRecord {
     ...(row.image_position ? { position: row.image_position } : {}),
   };
 
+  const firstVariantMeta =
+    Array.isArray(row.variants) && row.variants.length > 0
+      ? (row.variants[0] as ExtendedProductVariant)
+      : undefined;
+
+  const resolvedCategory: ProductCategory =
+    firstVariantMeta?.customCategory?.trim() || row.category;
+  const resolvedFabric: Fabric | null =
+    firstVariantMeta && "customFabric" in firstVariantMeta
+      ? (firstVariantMeta.customFabric ?? null)
+      : row.fabric;
+  const resolvedColour: ProductColour =
+    firstVariantMeta?.customColour?.trim() ||
+    firstVariantMeta?.colour?.trim() ||
+    row.colour;
+
   const fallbackDetails = createDemoDetails({
     id: row.id,
-    category: row.category,
-    fabric: row.fabric,
-    colour: row.colour,
+    category: resolvedCategory,
+    fabric: resolvedFabric,
+    colour: resolvedColour,
     photo,
   });
 
@@ -765,19 +801,26 @@ function rowToProduct(row: SupabaseProductRow, index = 0): AdminProductRecord {
       ? [
           {
             ...row.variants[0],
+            colour: resolvedColour,
+            customCategory: resolvedCategory,
+            customFabric: resolvedFabric,
+            customColour: resolvedColour,
             gallery:
               Array.isArray(row.variants[0].gallery) && row.variants[0].gallery.length > 0
                 ? [photo, ...row.variants[0].gallery.slice(1)]
                 : [photo],
-          },
+          } as ProductVariant,
           ...row.variants.slice(1),
         ]
       : [
           {
-            colour: row.colour,
+            colour: resolvedColour,
+            customCategory: resolvedCategory,
+            customFabric: resolvedFabric,
+            customColour: resolvedColour,
             stock: row.stock,
             gallery: [photo],
-          },
+          } as ProductVariant,
           ...fallbackDetails.variants.slice(1),
         ];
 
@@ -787,7 +830,12 @@ function rowToProduct(row: SupabaseProductRow, index = 0): AdminProductRecord {
   return {
     id: row.id,
     slug: row.slug || row.id,
-    sku: row.sku || generateSku({ id: row.id, category: row.category, fabric: row.fabric, colour: row.colour }, index),
+    sku:
+      row.sku ||
+      generateSku(
+        { id: row.id, category: resolvedCategory, fabric: resolvedFabric, colour: resolvedColour },
+        index,
+      ),
     name: row.name,
     description: row.description || fallbackDetails.description,
     price: Number(row.price),
@@ -800,9 +848,9 @@ function rowToProduct(row: SupabaseProductRow, index = 0): AdminProductRecord {
         : null,
     status: row.status === "inactive" ? "inactive" : "active",
     photo,
-    category: row.category,
-    fabric: row.fabric,
-    colour: row.colour,
+    category: resolvedCategory,
+    fabric: resolvedFabric,
+    colour: resolvedColour,
     addedAt: row.added_at || new Date().toISOString().slice(0, 10),
     stock: computedStock,
     lowStockThreshold: Number(row.low_stock_threshold ?? 5),
@@ -819,6 +867,31 @@ function rowToProduct(row: SupabaseProductRow, index = 0): AdminProductRecord {
 }
 
 function productToRow(product: AdminProductRecord): SupabaseProductRow {
+  const safeCategory: ProductCategory = SAFE_DB_CATEGORIES.has(product.category)
+    ? product.category
+    : "hijabs";
+  const safeFabric: Fabric | null =
+    product.fabric === null
+      ? null
+      : SAFE_DB_FABRICS.has(product.fabric)
+        ? product.fabric
+        : "modal";
+  const safeColour: ProductColour = SAFE_DB_COLOURS.has(product.colour)
+    ? product.colour
+    : "rose";
+
+  const variantsWithMeta: ProductVariant[] = product.details.variants.map((v, idx) =>
+    idx === 0
+      ? ({
+          ...v,
+          colour: product.colour,
+          customCategory: product.category,
+          customFabric: product.fabric,
+          customColour: product.colour,
+        } as ProductVariant)
+      : v,
+  );
+
   return {
     id: product.id,
     slug: product.slug,
@@ -829,9 +902,9 @@ function productToRow(product: AdminProductRecord): SupabaseProductRow {
     original_price: product.originalPrice ?? null,
     cost_price: product.costPrice,
     status: product.status,
-    category: product.category,
-    fabric: product.fabric,
-    colour: product.colour,
+    category: safeCategory,
+    fabric: safeFabric,
+    colour: safeColour,
     stock: product.stock,
     low_stock_threshold: product.lowStockThreshold,
     material: product.details.material,
@@ -841,7 +914,7 @@ function productToRow(product: AdminProductRecord): SupabaseProductRow {
     image_alt: product.photo.alt,
     image_position: product.photo.position ?? null,
     sections: product.sections,
-    variants: product.details.variants,
+    variants: variantsWithMeta,
     last_restocked_at: product.lastRestockedAt,
     added_at: product.addedAt,
   };
@@ -859,19 +932,17 @@ function supabaseHeaders(useServiceRole = false): HeadersInit {
   };
 }
 
-async function fetchRawProductsFromSource(bypassCache?: boolean): Promise<AdminProductRecord[]> {
+async function fetchRawProductsFromSource(): Promise<AdminProductRecord[]> {
   const config = getBackendConfig();
   let products: AdminProductRecord[] | null = null;
 
   if (config.supabaseConfigured) {
     try {
       const endpoint = `${config.supabaseUrl}/rest/v1/products?select=*&order=added_at.desc,created_at.desc`;
-      const response = await fetch(
-        endpoint,
-        bypassCache
-          ? { headers: supabaseHeaders(true), cache: "no-store" }
-          : { headers: supabaseHeaders(false), next: { revalidate: 120 } },
-      );
+      const response = await fetch(endpoint, {
+        headers: supabaseHeaders(true),
+        cache: "no-store",
+      });
 
       if (response.ok) {
         const rows = (await response.json()) as SupabaseProductRow[];
@@ -901,7 +972,7 @@ export async function getAllStoreProducts(options?: {
   let products: AdminProductRecord[];
 
   if (options?.bypassCache) {
-    products = await fetchRawProductsFromSource(true);
+    products = await fetchRawProductsFromSource();
     cachedRawProducts = {
       data: products,
       expiresAt: Date.now() + MEMORY_CACHE_TTL_MS,
@@ -910,7 +981,7 @@ export async function getAllStoreProducts(options?: {
     products = cachedRawProducts.data;
   } else {
     if (!inFlightProductsPromise) {
-      inFlightProductsPromise = fetchRawProductsFromSource(false)
+      inFlightProductsPromise = fetchRawProductsFromSource()
         .then((res) => {
           cachedRawProducts = {
             data: res,
@@ -1260,6 +1331,13 @@ export async function upsertStoreProduct(input: AdminProductInput): Promise<{
     if (customVariantStock !== undefined) {
       return {
         ...v,
+        ...(idx === 0
+          ? {
+              customCategory: category,
+              customFabric: fabric,
+              customColour: colour,
+            }
+          : {}),
         stock: Math.max(0, Math.round(Number(customVariantStock))),
         gallery:
           idx === 0
@@ -1271,6 +1349,13 @@ export async function upsertStoreProduct(input: AdminProductInput): Promise<{
       return {
         ...v,
         colour: idx === 0 ? colour : v.colour,
+        ...(idx === 0
+          ? {
+              customCategory: category,
+              customFabric: fabric,
+              customColour: colour,
+            }
+          : {}),
         stock: primaryStock,
         gallery: [photo, ...filteredGallery] as [Photo, ...Photo[]],
       };
@@ -1286,12 +1371,12 @@ export async function upsertStoreProduct(input: AdminProductInput): Promise<{
 
   // Ensure SKU is unique across all other products
   const otherSkus = new Set(
-    local.products.filter((item) => item.id !== id).map((item) => item.sku.toUpperCase()),
+    searchPool.filter((item) => item.id !== id).map((item) => item.sku.toUpperCase()),
   );
   let resolvedSku = (
     input.sku?.trim() ||
     existing?.sku ||
-    generateSku({ id, category, fabric, colour }, local.products.length)
+    generateSku({ id, category, fabric, colour }, searchPool.length)
   ).toUpperCase();
   let skuCounter = 2;
   const baseSku = resolvedSku;
@@ -1378,6 +1463,63 @@ export async function upsertStoreProduct(input: AdminProductInput): Promise<{
   }
   await writeLocalStore(local);
 
+  // Ensure product's category, fabric, and colour exist in store taxonomy so Shop filters & Categories stay in sync
+  try {
+    const currentSettings = await getStoreSettings();
+    const tax = currentSettings.taxonomy ?? DEFAULT_CATALOG_TAXONOMY;
+    let taxonomyChanged = false;
+    const nextCategories = [...tax.categories];
+    const nextFabrics = [...tax.fabrics];
+    const nextColours = [...tax.colours];
+
+    const toLabel = (val: string) =>
+      val
+        .split("-")
+        .filter(Boolean)
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(" ");
+
+    if (category && !nextCategories.some((c) => c.value === category)) {
+      nextCategories.push({
+        value: category,
+        label: toLabel(category),
+        hasFabric: Boolean(fabric),
+        imageSrc: photo.src,
+        imageAlt: `${toLabel(category)} collection`,
+      });
+      taxonomyChanged = true;
+    }
+    if (fabric && !nextFabrics.some((f) => f.value === fabric)) {
+      nextFabrics.push({
+        value: fabric,
+        label: toLabel(fabric),
+        imageSrc: photo.src,
+        imageAlt: `${toLabel(fabric)} hijabs`,
+      });
+      taxonomyChanged = true;
+    }
+    if (colour && !nextColours.some((c) => c.value === colour)) {
+      nextColours.push({
+        value: colour,
+        label: toLabel(colour),
+        swatch: "#5a6b7c",
+      });
+      taxonomyChanged = true;
+    }
+
+    if (taxonomyChanged) {
+      await updateStoreSettings({
+        taxonomy: {
+          categories: nextCategories,
+          fabrics: nextFabrics,
+          colours: nextColours,
+        },
+      });
+    }
+  } catch {
+    // Non-fatal taxonomy auto-registration
+  }
+
   // Smart Auto-Cleanup: Delete any replaced product image from Cloudinary / local uploads if no longer referenced
   void cleanupUnusedMediaUrls(previousMediaUrls);
 
@@ -1398,8 +1540,13 @@ export async function updateVariantInventory(input: {
   costPrice?: number | null;
   lowStockThreshold?: number;
 }): Promise<{ product: AdminProductRecord; storage: "supabase" | "local" }> {
-  const local = await readLocalStore();
-  const existing = local.products.find((item) => item.id === input.productId);
+  const [local, currentCatalog] = await Promise.all([
+    readLocalStore(),
+    getAllStoreProducts({ bypassCache: true, includeInactive: true }),
+  ]);
+  const existing =
+    currentCatalog.find((item) => item.id === input.productId) ??
+    local.products.find((item) => item.id === input.productId);
   if (!existing) {
     throw new Error(`Product not found: ${input.productId}`);
   }
@@ -1431,6 +1578,7 @@ export async function updateVariantInventory(input: {
 
   if (config.supabaseWriteConfigured) {
     try {
+      const rowPayload = productToRow(updated);
       const endpoint = `${config.supabaseUrl}/rest/v1/products?id=eq.${encodeURIComponent(updated.id)}`;
       const response = await fetch(endpoint, {
         method: "PATCH",
@@ -1439,7 +1587,7 @@ export async function updateVariantInventory(input: {
           stock: updated.stock,
           cost_price: updated.costPrice,
           low_stock_threshold: updated.lowStockThreshold,
-          variants: updated.details.variants,
+          variants: rowPayload.variants,
           last_restocked_at: updated.lastRestockedAt,
         }),
       });
@@ -1451,6 +1599,7 @@ export async function updateVariantInventory(input: {
 
   const idx = local.products.findIndex((item) => item.id === updated.id);
   if (idx >= 0) local.products[idx] = updated;
+  else local.products.unshift(updated);
   appendActivity(local, {
     type: "inventory",
     title: `Variant stock updated: ${updated.name} (${input.colour})`,

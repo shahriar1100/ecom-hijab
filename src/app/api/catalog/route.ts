@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     const [products, settings] = await Promise.all([
-      getAllStoreProducts(),
+      getAllStoreProducts({ bypassCache: true }),
       getStoreSettings(),
     ]);
     return NextResponse.json({
