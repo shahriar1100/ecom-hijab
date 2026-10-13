@@ -1791,6 +1791,8 @@ const SYSTEM_CUSTOMERS_ROW_ID = "__system_customers_registry__";
 const SYSTEM_CUSTOMERS_CODE = "__SYSTEM_CUSTOMERS__";
 const SYSTEM_CONTACT_MESSAGES_ROW_ID = "__system_contact_messages__";
 const SYSTEM_CONTACT_MESSAGES_CODE = "__SYSTEM_CONTACT_MESSAGES__";
+const SYSTEM_REVIEWS_ROW_ID = "__system_reviews_registry__";
+const SYSTEM_REVIEWS_CODE = "__SYSTEM_REVIEWS__";
 
 function isSystemCouponRow(row: { id: string; code: string }): boolean {
   return (
@@ -1800,6 +1802,8 @@ function isSystemCouponRow(row: { id: string; code: string }): boolean {
     row.code === SYSTEM_CUSTOMERS_CODE ||
     row.id === SYSTEM_CONTACT_MESSAGES_ROW_ID ||
     row.code === SYSTEM_CONTACT_MESSAGES_CODE ||
+    row.id === SYSTEM_REVIEWS_ROW_ID ||
+    row.code === SYSTEM_REVIEWS_CODE ||
     row.id.startsWith("__system_") ||
     row.code.startsWith("__SYSTEM_")
   );
@@ -2289,20 +2293,72 @@ export async function deleteStoreCoupon(id: string): Promise<void> {
   await writeLocalStore(local);
 }
 
-function normalizeTaxonomy(raw?: Partial<CatalogTaxonomy> | null): CatalogTaxonomy {
+function normalizeTaxonomy(
+  raw?: Partial<CatalogTaxonomy> | null,
+  products?: readonly AdminProductRecord[],
+): CatalogTaxonomy {
+  const categories =
+    Array.isArray(raw?.categories) && raw.categories.length > 0
+      ? [...raw.categories]
+      : [...DEFAULT_CATALOG_TAXONOMY.categories];
+  const fabrics =
+    Array.isArray(raw?.fabrics) && raw.fabrics.length > 0
+      ? [...raw.fabrics]
+      : [...DEFAULT_CATALOG_TAXONOMY.fabrics];
+  const colours =
+    Array.isArray(raw?.colours) && raw.colours.length > 0
+      ? [...raw.colours]
+      : [...DEFAULT_CATALOG_TAXONOMY.colours];
+
+  if (Array.isArray(products)) {
+    const toLabel = (val: string) =>
+      val
+        .split("-")
+        .filter(Boolean)
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(" ");
+
+    for (const p of products) {
+      if (p.category && !categories.some((c) => c.value === p.category)) {
+        categories.push({
+          value: p.category,
+          label: toLabel(p.category),
+          hasFabric: Boolean(p.fabric),
+          imageSrc: p.photo?.src,
+          imageAlt: `${toLabel(p.category)} collection`,
+        });
+      }
+      if (p.fabric && !fabrics.some((f) => f.value === p.fabric)) {
+        fabrics.push({
+          value: p.fabric,
+          label: toLabel(p.fabric),
+          imageSrc: p.photo?.src,
+          imageAlt: `${toLabel(p.fabric)} hijabs`,
+        });
+      }
+      if (p.colour && !colours.some((c) => c.value === p.colour)) {
+        colours.push({
+          value: p.colour,
+          label: toLabel(p.colour),
+          swatch: "#5a6b7c",
+        });
+      }
+      for (const v of p.details?.variants ?? []) {
+        if (v.colour && !colours.some((c) => c.value === v.colour)) {
+          colours.push({
+            value: v.colour,
+            label: toLabel(v.colour),
+            swatch: "#5a6b7c",
+          });
+        }
+      }
+    }
+  }
+
   return {
-    categories:
-      Array.isArray(raw?.categories) && raw.categories.length > 0
-        ? raw.categories
-        : DEFAULT_CATALOG_TAXONOMY.categories,
-    fabrics:
-      Array.isArray(raw?.fabrics) && raw.fabrics.length > 0
-        ? raw.fabrics
-        : DEFAULT_CATALOG_TAXONOMY.fabrics,
-    colours:
-      Array.isArray(raw?.colours) && raw.colours.length > 0
-        ? raw.colours
-        : DEFAULT_CATALOG_TAXONOMY.colours,
+    categories,
+    fabrics,
+    colours,
   };
 }
 
@@ -2466,7 +2522,7 @@ async function fetchStoreSettingsFromSource(): Promise<AdminSettingsRecord> {
               ...(local.settings.flashSale ?? {}),
               ...(parsed.flashSale ?? {}),
             },
-            taxonomy: normalizeTaxonomy(parsed.taxonomy ?? local.settings.taxonomy),
+            taxonomy: normalizeTaxonomy(parsed.taxonomy ?? local.settings.taxonomy, local.products),
             stories: normalizeStories(parsed.stories ?? local.settings.stories),
           };
         }
@@ -2501,7 +2557,7 @@ async function fetchStoreSettingsFromSource(): Promise<AdminSettingsRecord> {
       ...DEFAULT_FLASH_SALE,
       ...(local.settings.flashSale ?? {}),
     },
-    taxonomy: normalizeTaxonomy(local.settings.taxonomy),
+    taxonomy: normalizeTaxonomy(local.settings.taxonomy, local.products),
     stories: normalizeStories(local.settings.stories),
   };
 }
@@ -2592,7 +2648,7 @@ export async function updateStoreSettings(
       ...(currentSettings.flashSale ?? {}),
       ...(patch.flashSale ?? {}),
     },
-    taxonomy: normalizeTaxonomy(patch.taxonomy ?? currentSettings.taxonomy),
+    taxonomy: normalizeTaxonomy(patch.taxonomy ?? currentSettings.taxonomy, local.products),
     stories: normalizeStories(patch.stories ?? currentSettings.stories),
   };
 
@@ -2705,6 +2761,34 @@ export async function applyStoreCoupon(
   };
 }
 
+async function saveReviewsToSupabase(reviews: AdminReviewRecord[]): Promise<void> {
+  const config = getBackendConfig();
+  if (!config.supabaseWriteConfigured) return;
+  try {
+    await fetch(`${config.supabaseUrl}/rest/v1/coupons?on_conflict=id`, {
+      method: "POST",
+      headers: {
+        ...supabaseHeaders(true),
+        Prefer: "resolution=merge-duplicates,return=representation",
+      },
+      body: JSON.stringify([
+        {
+          id: SYSTEM_REVIEWS_ROW_ID,
+          code: SYSTEM_REVIEWS_CODE,
+          description: JSON.stringify(reviews),
+          discount_type: "fixed",
+          discount_value: 0,
+          min_order_amount: 0,
+          active: false,
+          usage_count: reviews.length,
+        },
+      ]),
+    });
+  } catch {
+    // Keep local reviews
+  }
+}
+
 async function fetchReviewsFromSource(options?: {
   productId?: string;
   status?: "all" | "approved" | "pending" | "rejected";
@@ -2758,6 +2842,36 @@ async function fetchReviewsFromSource(options?: {
             verifiedPurchase: r.verified_purchase,
             createdAt: r.created_at,
           }));
+        }
+      } else {
+        // Fallback: If public.reviews table does not exist in Supabase (404), read from system coupons row
+        const sysRes = await fetch(
+          `${config.supabaseUrl}/rest/v1/coupons?select=description&id=eq.${encodeURIComponent(SYSTEM_REVIEWS_ROW_ID)}&limit=1`,
+          {
+            headers: supabaseHeaders(true),
+            cache: "no-store",
+          },
+        );
+        if (sysRes.ok) {
+          const rows = (await sysRes.json()) as Array<{ description?: string }>;
+          if (rows[0]?.description) {
+            const parsed = JSON.parse(rows[0].description) as AdminReviewRecord[];
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              const products = await getAllStoreProducts({ includeInactive: true });
+              const prodMap = new Map(products.map((p) => [p.id, p.name]));
+              let list = parsed.map((r) => ({
+                ...r,
+                productName: r.productName || prodMap.get(r.productId) || "Hijab Product",
+              }));
+              if (options?.productId) {
+                list = list.filter((r) => r.productId === options.productId);
+              }
+              if (options?.status && options.status !== "all") {
+                list = list.filter((r) => r.status === options.status);
+              }
+              return list;
+            }
+          }
         }
       }
     } catch {
@@ -2910,6 +3024,7 @@ export async function createCustomerReview(input: {
     detail: `${record.rating}★ by ${record.customerName} (Order: ${record.orderId || "Direct"})`,
   });
   await writeLocalStore(local);
+  await saveReviewsToSupabase(local.reviews);
   return record;
 }
 
@@ -2941,6 +3056,7 @@ export async function updateStoreReview(
         detail: `Review by ${target.customerName} for ${target.productName || "Product"}`,
       });
       await writeLocalStore(local);
+      await saveReviewsToSupabase(local.reviews);
     }
   }
   return { ok: true };
@@ -2963,6 +3079,7 @@ export async function deleteStoreReview(id: string): Promise<{ ok: boolean }> {
   if (local.reviews) {
     local.reviews = local.reviews.filter((r) => r.id !== id);
     await writeLocalStore(local);
+    await saveReviewsToSupabase(local.reviews);
   }
   return { ok: true };
 }
