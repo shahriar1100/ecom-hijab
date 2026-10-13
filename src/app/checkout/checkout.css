@@ -558,7 +558,7 @@
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: #7c3f1c;
+  background: var(--brand);
   color: #fff;
   flex-shrink: 0;
 }
@@ -620,7 +620,7 @@
   display: grid;
   place-items: center;
   padding: 16px;
-  background: rgb(18 13 9 / 62%);
+  background: rgb(15 23 42 / 62%);
   backdrop-filter: blur(5px);
 }
 
@@ -632,16 +632,16 @@
   text-align: left;
   padding: 24px 22px 22px;
   border-radius: 22px;
-  background-color: #fcf7f1;
-  background-image: linear-gradient(160deg, #ffffff 0%, #fcf5ec 55%, #f2e4d4 100%);
-  border: 1px solid rgb(189 142 108 / 38%);
-  box-shadow: 0 24px 64px rgb(15 10 6 / 35%);
+  background-color: #f8fafc;
+  background-image: linear-gradient(160deg, #ffffff 0%, #f8fafc 55%, #eef4fb 100%);
+  border: 1px solid rgb(27 54 93 / 26%);
+  box-shadow: 0 24px 64px rgb(15 23 42 / 30%);
 }
 
 :root[data-theme="dark"] .post-purchase-modal {
-  background-color: #241d19;
-  background-image: linear-gradient(160deg, #2d241f 0%, #211a16 60%, #181310 100%);
-  border-color: rgb(221 176 140 / 26%);
+  background-color: #0f172a;
+  background-image: linear-gradient(160deg, #131d31 0%, #0f172a 60%, #0a0f1d 100%);
+  border-color: rgb(96 165 250 / 24%);
 }
 
 .post-purchase-modal-close {
@@ -668,7 +668,7 @@
   gap: 5px;
   padding: 4px 10px;
   border-radius: 999px;
-  background: #7c3f1c;
+  background: var(--brand);
   color: #fff;
   font-size: 10px;
   font-weight: 700;

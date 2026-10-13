@@ -83,7 +83,7 @@ export function resolveColourMeta(
   return {
     value: colourValue,
     label: formattedLabel,
-    swatch: "#9b5f3d",
+    swatch: "#1b365d",
   };
 }
 

@@ -1995,7 +1995,7 @@ export function AdminDashboard({
     if (e) e.preventDefault();
     const label = newColourLabel.trim();
     const value = toSlugKey(label);
-    const swatch = newColourSwatch.trim() || "#9b5f3d";
+    const swatch = newColourSwatch.trim() || "#1b365d";
     if (!label || !value) return;
     const existingIdx = taxonomy.colours.findIndex((c) => c.value === value);
     const nextColours =
