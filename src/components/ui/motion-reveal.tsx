@@ -76,11 +76,11 @@ function getInitialTransform(kind: RevealKind): string {
     case "heading":
       return "translate3d(-22px, 34px, 0) scale(0.96)";
     case "story":
-      return "translate3d(0, 52px, 0) scale(0.88) rotate(-1.5deg)";
+      return "translate3d(38px, 0px, 0) scale(0.88)";
     case "category":
-      return "translate3d(0, 56px, 0) scale(0.89)";
+      return "translate3d(36px, 0px, 0) scale(0.88)";
     case "top-product":
-      return "translate3d(0, 40px, 0) scale(0.76)";
+      return "translate3d(32px, 0px, 0) scale(0.78)";
     case "product":
       return "translate3d(0, 56px, 0) scale(0.9)";
     case "block":
@@ -88,10 +88,7 @@ function getInitialTransform(kind: RevealKind): string {
   }
 }
 
-function getFinalTransform(kind: RevealKind): string {
-  if (kind === "story") {
-    return "translate3d(0, 0px, 0) scale(1) rotate(0deg)";
-  }
+function getFinalTransform(): string {
   return "translate3d(0px, 0px, 0) scale(1)";
 }
 
@@ -148,6 +145,11 @@ export function StorefrontMotion() {
     const animatedSet = new WeakSet<Element>();
     const activeControls: Array<{ stop: () => void }> = [];
 
+    // Ensure horizontal scroll rows never retain a vertical scrollTop offset
+    document.querySelectorAll<HTMLElement>(".scroll-row").forEach((row) => {
+      row.scrollTop = 0;
+    });
+
     // Prepare initial hidden state so items stay hidden until scrolled into view
     for (const el of targets) {
       const kind = getRevealKind(el);
@@ -180,7 +182,7 @@ export function StorefrontMotion() {
 
           const kind = getRevealKind(el);
           const initialTransform = getInitialTransform(kind);
-          const finalTransform = getFinalTransform(kind);
+          const finalTransform = getFinalTransform();
           const duration = getDuration(kind);
           const staggerDelay = Math.min(batchIdx * 0.12, 0.6);
 

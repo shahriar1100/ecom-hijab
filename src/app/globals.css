@@ -166,11 +166,11 @@ html:has(.navigation-drawer[open]), html:has(.navigation-drawer[open]) body { ov
 .hero-pagination button { position: relative; width: 7px; height: 7px; border-radius: 50%; background: #dfd1c6; }
 .hero-pagination button::before { content: ""; position: absolute; inset: -5px -2px; }
 .hero-current-dot { width: 7px; height: 7px; border-radius: 50%; background: #8e5b39; }
-.scroll-row { overflow-x: auto; scrollbar-width: none; overscroll-behavior-inline: contain; scroll-snap-type: x proximity; }
+.scroll-row { overflow-x: auto; overflow-y: hidden; scrollbar-width: none; overscroll-behavior-inline: contain; scroll-snap-type: x proximity; }
 .scroll-row::-webkit-scrollbar { display: none; }
 .scroll-row > * { scroll-snap-align: start; }
-.stories-section { margin-top: 12px; }
-.story-row { display: flex; flex-wrap: nowrap; gap: 10px; padding: 4px 2px 8px; }
+.stories-section { margin-top: 14px; }
+.story-row { display: flex; flex-wrap: nowrap; gap: 10px; padding: 6px 2px 10px; }
 .story-card { position: relative; isolation: isolate; flex: 0 0 112px; min-width: 112px; height: 192px; overflow: hidden; border-radius: 12px; border: 1px solid rgb(189 152 124 / 30%); box-shadow: 0 6px 16px rgb(38 24 14 / 12%); cursor: pointer; padding: 0; background: #1e1814; }
 .story-card > img, .story-card-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform .3s ease; pointer-events: none; }
 .story-card:hover > img, .story-card:hover .story-card-video { transform: scale(1.05); }
