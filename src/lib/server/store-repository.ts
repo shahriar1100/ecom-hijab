@@ -748,6 +748,8 @@ function appendActivity(
 const SAFE_DB_CATEGORIES = new Set(["hijabs", "accessories"]);
 const SAFE_DB_FABRICS = new Set(["modal", "chiffon", "jersey", "silk"]);
 const SAFE_DB_COLOURS = new Set([
+  "white",
+  "navy",
   "rose",
   "olive",
   "black",

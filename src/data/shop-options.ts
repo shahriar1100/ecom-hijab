@@ -47,10 +47,11 @@ export const categoryOptions: CategoryOption[] = [
 ];
 
 export const colourOptions: ColourOption[] = [
+  { value: "white", label: "White", swatch: "#ffffff" },
+  { value: "navy", label: "Navy", swatch: "#1b365d" },
   { value: "rose", label: "Rose", swatch: "#c99595" },
   { value: "olive", label: "Olive", swatch: "#666b43" },
   { value: "black", label: "Black", swatch: "#292726" },
-  { value: "sand", label: "Sand", swatch: "#e6d5bd" },
   { value: "mocha", label: "Mocha", swatch: "#8b6550" },
   { value: "mauve", label: "Mauve", swatch: "#987780" },
   { value: "burgundy", label: "Burgundy", swatch: "#72283d" },
@@ -58,7 +59,7 @@ export const colourOptions: ColourOption[] = [
     value: "multi",
     label: "Multi",
     swatch:
-      "linear-gradient(135deg, #c99595 33%, #666b43 33%, #666b43 66%, #d6c4ad 66%)",
+      "linear-gradient(135deg, #c99595 33%, #666b43 33%, #666b43 66%, #1b365d 66%)",
   },
   { value: "gold", label: "Gold", swatch: "#c6a35a" },
 ];
@@ -73,6 +74,9 @@ export function resolveColourMeta(
   colourValue: string,
   customColours?: readonly ColourOption[],
 ): ColourOption {
+  if (colourValue === "sand" || colourValue === "cream" || colourValue === "ivory") {
+    return { value: "white", label: "White", swatch: "#ffffff" };
+  }
   const list = customColours && customColours.length > 0 ? customColours : colourOptions;
   const found =
     list.find((c) => c.value === colourValue) ??
