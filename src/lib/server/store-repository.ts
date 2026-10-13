@@ -277,9 +277,9 @@ export const DEFAULT_HERO_BANNER: HeroBannerConfig = {
   subtitle: "Premium Hijabs for You",
   ctaLabel: "Explore Collection",
   ctaHref: "#new-items",
-  imageSrc: "/images/hijab-black-banner.png",
-  imageAlt: "Studio portrait of a woman wearing a black hijab",
-  imagePosition: "center 18%",
+  imageSrc: photos.hero.src,
+  imageAlt: photos.hero.alt,
+  imagePosition: photos.hero.position || "center 42%",
 };
 
 export const DEFAULT_HERO_SLIDES: [HeroBannerConfig, HeroBannerConfig, HeroBannerConfig] = [
@@ -2204,6 +2204,14 @@ function normalizeStories(raw?: Story[] | null): Story[] {
     });
 }
 
+function sanitizeHeroImageSrc(rawSrc: string | undefined, fallbackSrc: string): string {
+  const trimmed = rawSrc?.trim();
+  if (!trimmed || trimmed === "/images/hijab-black-banner.png") {
+    return fallbackSrc;
+  }
+  return trimmed;
+}
+
 function normalizeHeroSlides(
   rawSlides?: HeroBannerConfig[] | null,
   primaryBanner?: HeroBannerConfig | null,
@@ -2215,17 +2223,30 @@ function normalizeHeroSlides(
   ];
   const inputSlides = Array.isArray(rawSlides) ? rawSlides : [];
   return baseSlides.map((fallback, idx) => {
+    const slideCandidate = inputSlides[idx];
     const candidate =
       idx === 0
-        ? (inputSlides[0] ?? primaryBanner ?? fallback)
-        : (inputSlides[idx] ?? fallback);
+        ? {
+            ...fallback,
+            ...(primaryBanner ?? {}),
+            ...(slideCandidate ?? {}),
+            imageSrc:
+              slideCandidate?.imageSrc &&
+              slideCandidate.imageSrc !== "/images/hijab-black-banner.png"
+                ? slideCandidate.imageSrc
+                : primaryBanner?.imageSrc &&
+                    primaryBanner.imageSrc !== "/images/hijab-black-banner.png"
+                  ? primaryBanner.imageSrc
+                  : fallback.imageSrc,
+          }
+        : (slideCandidate ?? fallback);
     return {
       titleLine1: candidate?.titleLine1?.trim() || fallback.titleLine1,
       titleLine2: candidate?.titleLine2?.trim() || fallback.titleLine2,
       subtitle: candidate?.subtitle?.trim() || fallback.subtitle,
       ctaLabel: candidate?.ctaLabel?.trim() || fallback.ctaLabel,
       ctaHref: candidate?.ctaHref?.trim() || fallback.ctaHref,
-      imageSrc: candidate?.imageSrc?.trim() || fallback.imageSrc,
+      imageSrc: sanitizeHeroImageSrc(candidate?.imageSrc, fallback.imageSrc),
       imageAlt: candidate?.imageAlt?.trim() || fallback.imageAlt,
       imagePosition: candidate?.imagePosition?.trim() || fallback.imagePosition,
     };
@@ -2242,7 +2263,7 @@ async function fetchStoreSettingsFromSource(): Promise<AdminSettingsRecord> {
         `${config.supabaseUrl}/rest/v1/coupons?select=description&id=eq.${encodeURIComponent(SYSTEM_SETTINGS_ROW_ID)}&limit=1`,
         {
           headers: supabaseHeaders(true),
-          next: { revalidate: 60 },
+          cache: "no-store",
         },
       );
       if (res.ok) {
@@ -2255,7 +2276,9 @@ async function fetchStoreSettingsFromSource(): Promise<AdminSettingsRecord> {
             ...(parsed.heroBanner ?? {}),
           };
           const normalizedSlides = normalizeHeroSlides(
-            parsed.heroSlides ?? local.settings.heroSlides,
+            Array.isArray(parsed.heroSlides) && parsed.heroSlides.length > 0
+              ? parsed.heroSlides
+              : local.settings.heroSlides,
             mergedPrimaryBanner,
           );
           return {

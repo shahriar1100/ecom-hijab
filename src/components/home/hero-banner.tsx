@@ -14,9 +14,18 @@ interface HeroBannerProps {
 
 const AUTO_SLIDE_INTERVAL_MS = 4800;
 
+function resolveHeroSrc(candidate: string | undefined, fallback: string): string {
+  const trimmed = candidate?.trim();
+  if (!trimmed || trimmed === "/images/hijab-black-banner.png") {
+    return fallback;
+  }
+  return trimmed;
+}
+
 export function HeroBanner({ banner, slides: propSlides }: HeroBannerProps) {
   const [activeSlide, setActiveSlide] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
+  const [failedSources, setFailedSources] = useState<Record<string, boolean>>({});
   const shouldReduceMotion = useReducedMotion();
 
   const defaultSlides: HeroBannerConfig[] = [
@@ -26,7 +35,7 @@ export function HeroBanner({ banner, slides: propSlides }: HeroBannerProps) {
       subtitle: banner?.subtitle || hero.subtitle,
       ctaLabel: banner?.ctaLabel || "Explore Collection",
       ctaHref: banner?.ctaHref || "#new-items",
-      imageSrc: banner?.imageSrc || hero.photo.src,
+      imageSrc: resolveHeroSrc(banner?.imageSrc, hero.photo.src),
       imageAlt: banner?.imageAlt || hero.photo.alt,
       imagePosition: banner?.imagePosition || hero.photo.position || "center 24%",
     },
@@ -52,6 +61,8 @@ export function HeroBanner({ banner, slides: propSlides }: HeroBannerProps) {
     },
   ];
 
+  const fallbackPool = [hero.photo.src, photos.sand.src, photos.rose.src];
+
   const slides: HeroBannerConfig[] =
     Array.isArray(propSlides) && propSlides.length > 0
       ? defaultSlides.map((fallback, idx) => {
@@ -63,7 +74,7 @@ export function HeroBanner({ banner, slides: propSlides }: HeroBannerProps) {
             subtitle: item.subtitle?.trim() || fallback.subtitle,
             ctaLabel: item.ctaLabel?.trim() || fallback.ctaLabel,
             ctaHref: item.ctaHref?.trim() || fallback.ctaHref,
-            imageSrc: item.imageSrc?.trim() || fallback.imageSrc,
+            imageSrc: resolveHeroSrc(item.imageSrc, fallback.imageSrc),
             imageAlt: item.imageAlt?.trim() || fallback.imageAlt,
             imagePosition: item.imagePosition?.trim() || fallback.imagePosition,
           };
@@ -82,8 +93,13 @@ export function HeroBanner({ banner, slides: propSlides }: HeroBannerProps) {
   }, [isPaused, shouldReduceMotion, slides.length]);
 
   const current = slides[activeSlide] ?? slides[0];
+  const safeImageSrc = failedSources[current.imageSrc]
+    ? (fallbackPool[activeSlide] ?? hero.photo.src)
+    : current.imageSrc;
   const isExternalImage =
-    current.imageSrc.startsWith("http://") || current.imageSrc.startsWith("https://");
+    safeImageSrc.startsWith("http://") ||
+    safeImageSrc.startsWith("https://") ||
+    safeImageSrc.startsWith("data:");
 
   return (
     <LazyMotion features={domAnimation}>
@@ -97,7 +113,7 @@ export function HeroBanner({ banner, slides: propSlides }: HeroBannerProps) {
       >
         <AnimatePresence mode="sync">
           <m.div
-            key={`hero-img-${activeSlide}-${current.imageSrc}`}
+            key={`hero-img-${activeSlide}-${safeImageSrc}`}
             className="hero-photo-motion"
             initial={shouldReduceMotion ? false : { opacity: 0, scale: 1.1 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -111,7 +127,7 @@ export function HeroBanner({ banner, slides: propSlides }: HeroBannerProps) {
             }}
           >
             <Image
-              src={current.imageSrc}
+              src={safeImageSrc}
               alt={current.imageAlt}
               fill
               preload={activeSlide === 0}
@@ -119,6 +135,9 @@ export function HeroBanner({ banner, slides: propSlides }: HeroBannerProps) {
               sizes="(min-width: 1328px) 1200px, (min-width: 768px) 90vw, 94vw"
               className="hero-photo"
               style={{ objectPosition: current.imagePosition }}
+              onError={() => {
+                setFailedSources((prev) => ({ ...prev, [current.imageSrc]: true }));
+              }}
             />
           </m.div>
         </AnimatePresence>

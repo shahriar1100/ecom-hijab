@@ -262,13 +262,18 @@ function buildHeroSlidesState(
     const fallback = DEFAULT_ADMIN_HERO_SLIDES[idx];
     const candidate =
       idx === 0 ? (input[0] ?? primaryBanner ?? fallback) : (input[idx] ?? fallback);
+    const rawSrc = candidate?.imageSrc?.trim();
+    const resolvedSrc =
+      !rawSrc || rawSrc === "/images/hijab-black-banner.png"
+        ? fallback.imageSrc
+        : rawSrc;
     return {
       titleLine1: candidate?.titleLine1 || fallback.titleLine1,
       titleLine2: candidate?.titleLine2 || fallback.titleLine2,
       subtitle: candidate?.subtitle || fallback.subtitle,
       ctaLabel: candidate?.ctaLabel || fallback.ctaLabel,
       ctaHref: candidate?.ctaHref || fallback.ctaHref,
-      imageSrc: candidate?.imageSrc || fallback.imageSrc,
+      imageSrc: resolvedSrc,
       imageAlt: candidate?.imageAlt || fallback.imageAlt,
       imagePosition: candidate?.imagePosition || fallback.imagePosition,
     };
@@ -1372,6 +1377,46 @@ export function AdminDashboard({
     }
   }
 
+  async function persistHeroSlidesToServer(
+    slidesToSave: [HeroBannerConfig, HeroBannerConfig, HeroBannerConfig],
+    successMessage: string,
+  ) {
+    const cleanedSlides = slidesToSave.map((slide, idx) => {
+      const fallback = DEFAULT_ADMIN_HERO_SLIDES[idx];
+      const rawSrc = slide.imageSrc.trim();
+      return {
+        titleLine1: slide.titleLine1.trim() || fallback.titleLine1,
+        titleLine2: slide.titleLine2.trim() || fallback.titleLine2,
+        subtitle: slide.subtitle.trim() || fallback.subtitle,
+        ctaLabel: slide.ctaLabel.trim() || fallback.ctaLabel,
+        ctaHref: slide.ctaHref.trim() || fallback.ctaHref,
+        imageSrc:
+          !rawSrc || rawSrc === "/images/hijab-black-banner.png"
+            ? fallback.imageSrc
+            : rawSrc,
+        imageAlt: slide.imageAlt.trim() || fallback.imageAlt,
+        imagePosition: slide.imagePosition.trim() || fallback.imagePosition,
+      };
+    }) as [HeroBannerConfig, HeroBannerConfig, HeroBannerConfig];
+
+    setHeroSlides(cleanedSlides);
+
+    const res = await fetch("/api/admin/settings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        heroBanner: cleanedSlides[0],
+        heroSlides: cleanedSlides,
+      }),
+    });
+    if (res.ok) {
+      await fetchAnalyticsData();
+      setFeedback(successMessage);
+    } else {
+      setFeedback("Failed to save Hero Carousel settings.");
+    }
+  }
+
   async function handleBannerFileSelect(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -1392,18 +1437,24 @@ export function AdminDashboard({
         setFeedback(`Banner upload error: ${data.error || "Failed to upload banner image"}`);
         return;
       }
-      updateCurrentBannerSlide({
-        imageSrc: data.url,
-        imageAlt:
-          !bannerImageAlt ||
-          bannerImageAlt === DEFAULT_ADMIN_HERO_SLIDES[activeBannerSlideIdx].imageAlt
-            ? `${bannerTitle1} ${bannerTitle2} — NOOR Hero Slide ${activeBannerSlideIdx + 1}`.trim()
-            : bannerImageAlt,
-      });
-      setFeedback(
+      const nextAlt =
+        !bannerImageAlt ||
+        bannerImageAlt === DEFAULT_ADMIN_HERO_SLIDES[activeBannerSlideIdx].imageAlt ||
+        bannerImageAlt === "Studio portrait of a woman wearing a black hijab"
+          ? `${bannerTitle1} ${bannerTitle2} — NOOR Hero Slide ${activeBannerSlideIdx + 1}`.trim()
+          : bannerImageAlt;
+
+      const nextSlides = heroSlides.map((slide, idx) =>
+        idx === activeBannerSlideIdx
+          ? { ...slide, imageSrc: data.url!, imageAlt: nextAlt }
+          : slide,
+      ) as [HeroBannerConfig, HeroBannerConfig, HeroBannerConfig];
+
+      await persistHeroSlidesToServer(
+        nextSlides,
         data.mode === "cloudinary"
-          ? `Slide ${activeBannerSlideIdx + 1} photo uploaded to Cloudinary CDN! Click 'Save & Publish All 3 Slides' to publish.`
-          : `Slide ${activeBannerSlideIdx + 1} photo uploaded to local storage! Click 'Save & Publish All 3 Slides' to publish.`,
+          ? `Slide ${activeBannerSlideIdx + 1} photo uploaded to Cloudinary CDN and published live on Homepage!`
+          : `Slide ${activeBannerSlideIdx + 1} photo uploaded and published live on Homepage!`,
       );
     } catch {
       setFeedback("Failed to upload banner image file.");
@@ -1418,36 +1469,10 @@ export function AdminDashboard({
     setSavingBanner(true);
     setFeedback("");
     try {
-      const cleanedSlides = heroSlides.map((slide, idx) => {
-        const fallback = DEFAULT_ADMIN_HERO_SLIDES[idx];
-        return {
-          titleLine1: slide.titleLine1.trim() || fallback.titleLine1,
-          titleLine2: slide.titleLine2.trim() || fallback.titleLine2,
-          subtitle: slide.subtitle.trim() || fallback.subtitle,
-          ctaLabel: slide.ctaLabel.trim() || fallback.ctaLabel,
-          ctaHref: slide.ctaHref.trim() || fallback.ctaHref,
-          imageSrc: slide.imageSrc.trim() || fallback.imageSrc,
-          imageAlt: slide.imageAlt.trim() || fallback.imageAlt,
-          imagePosition: slide.imagePosition.trim() || fallback.imagePosition,
-        };
-      }) as [HeroBannerConfig, HeroBannerConfig, HeroBannerConfig];
-
-      const res = await fetch("/api/admin/settings", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          heroBanner: cleanedSlides[0],
-          heroSlides: cleanedSlides,
-        }),
-      });
-      if (res.ok) {
-        await fetchAnalyticsData();
-        setFeedback(
-          "All 3 Homepage Hero Carousel Slides updated and published live on storefront!",
-        );
-      } else {
-        setFeedback("Failed to save Hero Carousel settings.");
-      }
+      await persistHeroSlidesToServer(
+        heroSlides,
+        "All 3 Homepage Hero Carousel Slides updated and published live on storefront!",
+      );
     } catch {
       setFeedback("Network error while saving Hero Carousel.");
     } finally {
@@ -1457,20 +1482,24 @@ export function AdminDashboard({
 
   function handleResetHeroBanner() {
     const def = DEFAULT_ADMIN_HERO_SLIDES[activeBannerSlideIdx];
-    updateCurrentBannerSlide({ ...def });
-    setFeedback(
-      `Slide ${activeBannerSlideIdx + 1} reset to NOOR default. Click 'Save & Publish All 3 Slides' to apply.`,
+    const nextSlides = heroSlides.map((slide, idx) =>
+      idx === activeBannerSlideIdx ? { ...def } : slide,
+    ) as [HeroBannerConfig, HeroBannerConfig, HeroBannerConfig];
+    void persistHeroSlidesToServer(
+      nextSlides,
+      `Slide ${activeBannerSlideIdx + 1} reset to NOOR default and published live!`,
     );
   }
 
   function handleResetAllHeroSlides() {
-    setHeroSlides([
+    const defaultSlides: [HeroBannerConfig, HeroBannerConfig, HeroBannerConfig] = [
       { ...DEFAULT_ADMIN_HERO_SLIDES[0] },
       { ...DEFAULT_ADMIN_HERO_SLIDES[1] },
       { ...DEFAULT_ADMIN_HERO_SLIDES[2] },
-    ]);
-    setFeedback(
-      "All 3 Hero Slides reset to NOOR defaults. Click 'Save & Publish All 3 Slides' to apply.",
+    ];
+    void persistHeroSlidesToServer(
+      defaultSlides,
+      "All 3 Hero Slides reset to NOOR defaults and published live!",
     );
   }
 

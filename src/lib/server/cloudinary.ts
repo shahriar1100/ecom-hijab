@@ -214,13 +214,27 @@ export async function uploadProductImage(file: File): Promise<UploadImageResult>
       .slice(0, 40) || (isVideo ? "story-video" : "product");
   const fileName = `${safeBase}-${Date.now()}${ext}`;
   const uploadDir = path.join(process.cwd(), "public", "uploads");
-  await mkdir(uploadDir, { recursive: true });
-  await writeFile(path.join(uploadDir, fileName), bytes);
+  try {
+    await mkdir(uploadDir, { recursive: true });
+    await writeFile(path.join(uploadDir, fileName), bytes);
 
-  return {
-    url: `/uploads/${fileName}`,
-    mode: "local",
-    resourceType,
-  };
+    return {
+      url: `/uploads/${fileName}`,
+      mode: "local",
+      resourceType,
+    };
+  } catch {
+    if (!isVideo) {
+      const mimeType = file.type || "image/jpeg";
+      return {
+        url: `data:${mimeType};base64,${bytes.toString("base64")}`,
+        mode: "local",
+        resourceType: "image",
+      };
+    }
+    throw new Error(
+      "Video upload requires Cloudinary environment variables (NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET) on serverless hosting.",
+    );
+  }
 }
 
