@@ -95,6 +95,7 @@ export function CheckoutContent({
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<"signup" | "login">("signup");
   const [modalPassword, setModalPassword] = useState("");
+  const [modalEmail, setModalEmail] = useState("");
   const [modalIdentifier, setModalIdentifier] = useState("");
   const [modalError, setModalError] = useState("");
 
@@ -191,10 +192,15 @@ export function CheckoutContent({
     if (!confirmedOrder) return;
 
     if (authModalMode === "signup") {
+      const emailToUse = (confirmedOrder.customer.email || modalEmail).trim().toLowerCase();
+      if (!emailToUse || !emailToUse.includes("@") || !emailToUse.includes(".")) {
+        setModalError("Please enter a valid email address for account security & password recovery.");
+        return;
+      }
       const result = await signupUserAsync({
         name: confirmedOrder.customer.name,
         phone: confirmedOrder.customer.phone,
-        email: confirmedOrder.customer.email,
+        email: emailToUse,
         address: confirmedOrder.customer.address,
         city: confirmedOrder.customer.city,
         password: modalPassword,
@@ -444,9 +450,35 @@ export function CheckoutContent({
                 {authModalMode === "signup" ? (
                   <div className="post-purchase-prefill-box">
                     <div>
-                      <span>Name & Phone</span>
+                      <span>Name &amp; Phone</span>
                       <strong>{confirmedOrder.customer.name} · {confirmedOrder.customer.phone}</strong>
                     </div>
+                    {confirmedOrder.customer.email ? (
+                      <div>
+                        <span>Account Email</span>
+                        <strong>{confirmedOrder.customer.email}</strong>
+                      </div>
+                    ) : (
+                      <div style={{ marginTop: 4 }}>
+                        <span style={{ fontSize: 12, fontWeight: 600 }}>Email Address (Required for Password Recovery) *</span>
+                        <input
+                          type="email"
+                          required
+                          placeholder="you@example.com"
+                          value={modalEmail}
+                          onChange={(e) => setModalEmail(e.target.value)}
+                          style={{
+                            width: "100%",
+                            marginTop: 4,
+                            padding: "8px 12px",
+                            borderRadius: 6,
+                            border: "1px solid var(--line)",
+                            background: "var(--surface)",
+                            fontSize: 13,
+                          }}
+                        />
+                      </div>
+                    )}
                     <div>
                       <span>Saved Address</span>
                       <strong>{confirmedOrder.customer.address}, {confirmedOrder.customer.city}</strong>

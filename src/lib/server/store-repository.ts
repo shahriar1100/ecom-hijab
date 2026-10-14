@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -425,6 +425,9 @@ export type CustomerAccountRecord = {
   address?: string;
   city?: string;
   password: string;
+  resetToken?: string | null;
+  resetCode?: string | null;
+  resetExpiresAt?: string | null;
   createdAt: string;
 };
 
@@ -3295,6 +3298,126 @@ export async function changeCustomerAccountPassword(input: {
   };
   await saveCustomerAccounts(local, accounts);
   return { ok: true };
+}
+
+export async function createPasswordResetRequest(rawEmail: string): Promise<
+  | { ok: true; token: string; code: string; email: string; name: string }
+  | { ok: false; error: string }
+> {
+  const cleanEmail = rawEmail.trim().toLowerCase();
+  if (!cleanEmail || !cleanEmail.includes("@")) {
+    return { ok: false, error: "Please enter a valid email address." };
+  }
+
+  const local = await readLocalStore();
+  const accounts = await getCustomerAccounts();
+  const idx = accounts.findIndex((u) => u.email && u.email.toLowerCase() === cleanEmail);
+
+  if (idx < 0) {
+    return {
+      ok: false,
+      error: "No account found with this email address. Please check your spelling or sign up.",
+    };
+  }
+
+  const account = accounts[idx];
+  const token = randomBytes(32).toString("hex");
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+
+  accounts[idx] = {
+    ...account,
+    resetToken: token,
+    resetCode: code,
+    resetExpiresAt: expiresAt,
+  };
+
+  await saveCustomerAccounts(local, accounts);
+
+  return {
+    ok: true,
+    token,
+    code,
+    email: account.email || cleanEmail,
+    name: account.name,
+  };
+}
+
+export async function verifyPasswordResetTokenOrCode(tokenOrCode: string): Promise<
+  | { ok: true; email: string; name: string }
+  | { ok: false; error: string }
+> {
+  const clean = tokenOrCode.trim();
+  if (!clean) return { ok: false, error: "Reset token or code is required." };
+
+  const accounts = await getCustomerAccounts();
+  const now = Date.now();
+
+  const match = accounts.find(
+    (u) =>
+      (u.resetToken === clean || u.resetCode === clean) &&
+      u.resetExpiresAt &&
+      new Date(u.resetExpiresAt).getTime() > now,
+  );
+
+  if (!match) {
+    return {
+      ok: false,
+      error: "This reset link or verification code is invalid or has expired.",
+    };
+  }
+
+  return {
+    ok: true,
+    email: match.email || "",
+    name: match.name,
+  };
+}
+
+export async function resetCustomerPassword(
+  tokenOrCode: string,
+  newPassword: string,
+): Promise<{ ok: true; email: string; name: string } | { ok: false; error: string }> {
+  const clean = tokenOrCode.trim();
+  if (!clean) return { ok: false, error: "Reset token or code is required." };
+  if (!newPassword || newPassword.length < 4) {
+    return { ok: false, error: "New password must be at least 4 characters long." };
+  }
+
+  const local = await readLocalStore();
+  const accounts = await getCustomerAccounts();
+  const now = Date.now();
+
+  const idx = accounts.findIndex(
+    (u) =>
+      (u.resetToken === clean || u.resetCode === clean) &&
+      u.resetExpiresAt &&
+      new Date(u.resetExpiresAt).getTime() > now,
+  );
+
+  if (idx < 0) {
+    return {
+      ok: false,
+      error: "This reset link or verification code has expired. Please request a new one.",
+    };
+  }
+
+  const account = accounts[idx];
+  accounts[idx] = {
+    ...account,
+    password: hashCustomerPassword(newPassword),
+    resetToken: null,
+    resetCode: null,
+    resetExpiresAt: null,
+  };
+
+  await saveCustomerAccounts(local, accounts);
+
+  return {
+    ok: true,
+    email: account.email || "",
+    name: account.name,
+  };
 }
 
 export async function updateCustomerAccountProfile(input: {

@@ -29,6 +29,13 @@ export async function POST(request: Request) {
           { status: 400 },
         );
       }
+      const cleanEmail = body.email?.trim().toLowerCase();
+      if (!cleanEmail || !cleanEmail.includes("@") || !cleanEmail.includes(".")) {
+        return NextResponse.json(
+          { ok: false, error: "A valid email address is required for account creation and password recovery." },
+          { status: 400 },
+        );
+      }
       if (!body.password || body.password.length < 4) {
         return NextResponse.json(
           { ok: false, error: "Password must be at least 4 characters long." },

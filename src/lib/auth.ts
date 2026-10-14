@@ -124,6 +124,9 @@ export function signupUser(input: {
   if (!cleanName || !cleanPhone) {
     return { ok: false, error: "Please enter your full name and phone number." };
   }
+  if (!cleanEmail || !cleanEmail.includes("@") || !cleanEmail.includes(".")) {
+    return { ok: false, error: "A valid email address is required for account creation and password recovery." };
+  }
   if (input.password.length < 4) {
     return { ok: false, error: "Password must be at least 4 characters long." };
   }
@@ -392,6 +395,53 @@ export async function changeUserPasswordAsync(input: {
 
 export function logoutUser() {
   writeSessionUser(null);
+}
+
+export async function requestPasswordResetAsync(email: string): Promise<{
+  ok: boolean;
+  message: string;
+  devMode?: boolean;
+  devPreview?: { code: string; token: string; resetUrl: string };
+}> {
+  try {
+    const res = await fetch("/api/auth/forgot-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: email.trim().toLowerCase() }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) {
+      return { ok: false, message: data.error || "Failed to process forgot password request." };
+    }
+    return {
+      ok: true,
+      message: data.message,
+      devMode: data.devMode,
+      devPreview: data.devPreview,
+    };
+  } catch {
+    return { ok: false, message: "Network connection error. Please try again." };
+  }
+}
+
+export async function resetPasswordWithTokenAsync(
+  tokenOrCode: string,
+  newPassword: string,
+): Promise<{ ok: boolean; message: string; email?: string }> {
+  try {
+    const res = await fetch("/api/auth/reset-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tokenOrCode: tokenOrCode.trim(), newPassword }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) {
+      return { ok: false, message: data.error || "Failed to reset password." };
+    }
+    return { ok: true, message: data.message, email: data.email };
+  } catch {
+    return { ok: false, message: "Network connection error. Please try again." };
+  }
 }
 
 export function useAuth() {

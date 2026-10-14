@@ -92,10 +92,15 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
         announceNotice("Signed in", `Welcome back, ${result.user.name}!`);
         router.push("/account");
       } else {
+        if (!effectiveEmail?.trim() || !effectiveEmail.includes("@") || !effectiveEmail.includes(".")) {
+          setError("A valid email address is required for account creation and password recovery.");
+          setSubmitting(false);
+          return;
+        }
         const result = await signupUserAsync({
           name: effectiveName,
           phone: effectivePhone,
-          email: effectiveEmail,
+          email: effectiveEmail.trim().toLowerCase(),
           city: effectiveCity,
           address: effectiveAddress,
           password,
@@ -190,10 +195,11 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
                 </div>
 
                 <div className="auth-field">
-                  <label htmlFor="auth-email">Email (Optional)</label>
+                  <label htmlFor="auth-email">Email Address *</label>
                   <input
                     id="auth-email"
                     type="email"
+                    required
                     autoComplete="email"
                     placeholder="you@example.com"
                     value={effectiveEmail}
@@ -229,9 +235,24 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
           )}
 
           <div className="auth-field">
-            <label htmlFor="auth-password">
-              {mode === "login" ? "Password *" : "Create Password (min 4 characters) *"}
-            </label>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
+              <label htmlFor="auth-password" style={{ margin: 0 }}>
+                {mode === "login" ? "Password *" : "Create Password (min 4 characters) *"}
+              </label>
+              {mode === "login" && (
+                <Link
+                  href="/forgot-password"
+                  style={{
+                    fontSize: 12,
+                    color: "var(--link, #8b5cf6)",
+                    textDecoration: "underline",
+                    fontWeight: 500,
+                  }}
+                >
+                  Forgot password?
+                </Link>
+              )}
+            </div>
             <div className="auth-password-wrap">
               <input
                 id="auth-password"
