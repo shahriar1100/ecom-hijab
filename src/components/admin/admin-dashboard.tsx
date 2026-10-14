@@ -3481,13 +3481,13 @@ export function AdminDashboard({
                       </div>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                         {taxonomy.categories.map((cat) => {
-                          const catProductPhoto = products.find(
-                            (p) => p.category === cat.value && p.status === "active",
-                          )?.photo.src;
-                          const previewSrc =
-                            cat.imageSrc?.trim() ||
-                            catProductPhoto ||
-                            (cat.value === "accessories" ? photos.accessories.src : photos.folded.src);
+                          const fallbackPhoto =
+                            cat.value === "accessories"
+                              ? photos.accessories.src
+                              : cat.value === "hijabs"
+                                ? photos.rose.src
+                                : photos.folded.src;
+                          const previewSrc = cat.imageSrc?.trim() || fallbackPhoto;
                           const isUploadingThis = uploadingTaxonomyKey === `cat:${cat.value}`;
                           return (
                             <span
@@ -3654,7 +3654,7 @@ export function AdminDashboard({
                           Uses fabric selection (e.g. Modal, Silk)
                         </label>
                         <span style={{ fontSize: 10, color: "var(--muted)" }}>
-                          Photo optional (auto-uses 1st product photo)
+                          Photo optional (click icon to upload category thumbnail)
                         </span>
                       </div>
                     </form>

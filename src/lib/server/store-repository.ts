@@ -7,7 +7,7 @@ import { catalogProducts } from "@/data/catalog";
 import { photos } from "@/data/photos";
 import { createDemoDetails } from "@/data/product-details";
 import { DEFAULT_CATALOG_TAXONOMY, type CatalogTaxonomy } from "@/data/shop-options";
-import { sliderCategories, stories as defaultStories } from "@/data/store";
+import { stories as defaultStories } from "@/data/store";
 import type { Order, OrderDeliveryZone, OrderPaymentMethod } from "@/lib/orders";
 import type {
   CatalogProduct,
@@ -1074,79 +1074,30 @@ export async function getHomepageCollections() {
   const fallbackPool = [
     photos.folded,
     photos.rose,
+    photos.black,
     photos.mauve,
-    photos.olive,
     photos.sand,
+    photos.olive,
     photos.mocha,
   ];
 
-  // 1. Custom categories added by Admin (everything except the base "hijabs" umbrella, plus "accessories")
-  const customCategories: Category[] = taxonomy.categories
-    .filter((cat) => cat.value !== "hijabs" && cat.value !== "accessories")
-    .map((cat, idx) => {
-      const matchingProduct = products.find((p) => p.category === cat.value);
-      const fallbackPhoto = fallbackPool[idx % fallbackPool.length];
-      const src = cat.imageSrc || matchingProduct?.photo.src || fallbackPhoto.src;
-      const alt =
-        cat.imageAlt ||
-        matchingProduct?.photo.alt ||
-        `${cat.label} collection`;
-      return {
-        id: `cat-${cat.value}`,
-        name: cat.label,
-        photo: { src, alt },
-        href: `/shop?category=${encodeURIComponent(cat.value)}`,
-      };
-    });
-
-  // 2. All active fabrics from taxonomy
-  const fabricCategoryItems: Category[] = taxonomy.fabrics.map((fab, idx) => {
-    const matchingProduct = products.find((p) => p.fabric === fab.value);
-    const defaultMatch = sliderCategories.find((c) => c.id === fab.value);
-    const fallbackPhoto = fallbackPool[(idx + 2) % fallbackPool.length];
-    const src =
-      fab.imageSrc ||
-      defaultMatch?.photo.src ||
-      matchingProduct?.photo.src ||
-      fallbackPhoto.src;
-    const alt =
-      fab.imageAlt ||
-      defaultMatch?.photo.alt ||
-      matchingProduct?.photo.alt ||
-      `${fab.label} hijabs`;
+  // Homepage Categories slider: matches the exact categories managed in Admin (taxonomy.categories)
+  const homepageCategories: Category[] = taxonomy.categories.map((cat, idx) => {
+    const fallbackPhoto =
+      cat.value === "accessories"
+        ? photos.accessories
+        : cat.value === "hijabs"
+          ? photos.rose
+          : fallbackPool[idx % fallbackPool.length];
+    const src = cat.imageSrc?.trim() || fallbackPhoto.src;
+    const alt = cat.imageAlt?.trim() || `${cat.label} collection`;
     return {
-      id: fab.value,
-      name: fab.label,
+      id: `cat-${cat.value}`,
+      name: cat.label,
       photo: { src, alt },
-      href: `/shop?fabric=${encodeURIComponent(fab.value)}`,
+      href: `/shop?category=${encodeURIComponent(cat.value)}`,
     };
   });
-
-  // 3. Accessories (if active in taxonomy.categories)
-  const accessoriesCat = taxonomy.categories.find((c) => c.value === "accessories");
-  const accessoriesItem: Category[] = accessoriesCat
-    ? [
-        {
-          id: "accessories",
-          name: accessoriesCat.label,
-          photo: {
-            src: accessoriesCat.imageSrc || photos.accessories.src,
-            alt: accessoriesCat.imageAlt || photos.accessories.alt,
-          },
-          href: "/shop?category=accessories",
-        },
-      ]
-    : [];
-
-  // 4. Extra curated showcase items from sliderCategories so the slider stays full
-  const extraSliderItems = sliderCategories.slice(5);
-
-  const homepageCategories: Category[] = [
-    ...customCategories,
-    ...fabricCategoryItems,
-    ...accessoriesItem,
-    ...extraSliderItems,
-  ];
 
   return {
     allProducts: products,
@@ -2419,7 +2370,6 @@ function normalizeTaxonomy(
           value: p.category,
           label: toLabel(p.category),
           hasFabric: Boolean(p.fabric),
-          imageSrc: p.photo?.src,
           imageAlt: `${toLabel(p.category)} collection`,
         });
       }
@@ -2427,7 +2377,6 @@ function normalizeTaxonomy(
         fabrics.push({
           value: p.fabric,
           label: toLabel(p.fabric),
-          imageSrc: p.photo?.src,
           imageAlt: `${toLabel(p.fabric)} hijabs`,
         });
       }
