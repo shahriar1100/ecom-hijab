@@ -1040,12 +1040,24 @@ export function AdminDashboard({
     setGalleryPhotos(updated);
     setImageSrc(target.src);
     setImageAlt(target.alt || name || "Product photo");
+    if (target.colour) {
+      setColour(target.colour);
+    }
+  }
+
+  function handleSetPhotoColour(index: number, newColour: ProductColour) {
+    setGalleryPhotos((prev) =>
+      prev.map((p, idx) => (idx === index ? { ...p, colour: newColour } : p)),
+    );
+    if (index === 0) {
+      setColour(newColour);
+    }
   }
 
   function handleRemovePhoto(index: number) {
     const updated = galleryPhotos.filter((_, idx) => idx !== index);
     if (updated.length === 0) {
-      setGalleryPhotos([{ src: photos.rose.src, alt: photos.rose.alt }]);
+      setGalleryPhotos([{ src: photos.rose.src, alt: photos.rose.alt, colour: colour || "rose" }]);
       setImageSrc(photos.rose.src);
       setImageAlt(photos.rose.alt);
     } else {
@@ -1053,6 +1065,9 @@ export function AdminDashboard({
       if (index === 0) {
         setImageSrc(updated[0].src);
         setImageAlt(updated[0].alt || name || "Product photo");
+        if (updated[0].colour) {
+          setColour(updated[0].colour);
+        }
       }
     }
   }
@@ -1084,10 +1099,50 @@ export function AdminDashboard({
         return;
       }
 
+      const availableColours = taxonomy.colours.map((c) => c.value);
+      const isInitialDefault =
+        galleryPhotos.length === 1 && galleryPhotos[0].src === photos.rose.src;
+      const alreadyAssigned = new Set<string>(
+        isInitialDefault ? [] : galleryPhotos.map((p) => p.colour || colour),
+      );
+
+      let unusedIndex = 0;
+      function pickColourForFile(fname: string, fallback: ProductColour): ProductColour {
+        const lower = fname.toLowerCase();
+        for (const c of taxonomy.colours) {
+          if (
+            lower.includes(c.value.toLowerCase()) ||
+            lower.includes(c.label.toLowerCase())
+          ) {
+            alreadyAssigned.add(c.value);
+            return c.value;
+          }
+        }
+        while (unusedIndex < availableColours.length) {
+          const candidate = availableColours[unusedIndex];
+          unusedIndex++;
+          if (!alreadyAssigned.has(candidate)) {
+            alreadyAssigned.add(candidate);
+            return candidate;
+          }
+        }
+        return fallback;
+      }
+
       const uploadedPhotos: Photo[] = [];
       if (Array.isArray(data.photos) && data.photos.length > 0) {
-        for (const p of data.photos) {
-          if (p?.src) uploadedPhotos.push(p);
+        for (let i = 0; i < data.photos.length; i++) {
+          const p = data.photos[i];
+          if (p?.src) {
+            const fname = files[i]?.name || "";
+            const assignedColour = i === 0 && isInitialDefault
+              ? colour
+              : pickColourForFile(fname, colour);
+            uploadedPhotos.push({
+              ...p,
+              colour: assignedColour,
+            });
+          }
         }
       } else if (Array.isArray(data.urls) && data.urls.length > 0) {
         for (let i = 0; i < data.urls.length; i++) {
@@ -1095,32 +1150,44 @@ export function AdminDashboard({
           const fname =
             files[i]?.name?.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ") ||
             (name ? `${name} photo ${i + 1}` : "Product photo");
-          uploadedPhotos.push({ src: u, alt: fname });
+          const assignedColour = i === 0 && isInitialDefault
+            ? colour
+            : pickColourForFile(files[i]?.name || "", colour);
+          uploadedPhotos.push({
+            src: u,
+            alt: fname,
+            colour: assignedColour,
+          });
         }
       } else if (data.url) {
         const fname =
           files[0]?.name?.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ") ||
           (name ? `${name} studio product photo` : "Product photo");
-        uploadedPhotos.push({ src: data.url, alt: fname });
+        uploadedPhotos.push({
+          src: data.url,
+          alt: fname,
+          colour: pickColourForFile(files[0]?.name || "", colour),
+        });
       }
 
       if (uploadedPhotos.length > 0) {
         setGalleryPhotos((prev) => {
-          const isInitialDefault =
-            prev.length === 1 && prev[0].src === photos.rose.src;
           const nextGallery = isInitialDefault
             ? uploadedPhotos
             : [...prev, ...uploadedPhotos];
           if (nextGallery[0]) {
             setImageSrc(nextGallery[0].src);
             setImageAlt(nextGallery[0].alt || name || "Product photo");
+            if (nextGallery[0].colour) {
+              setColour(nextGallery[0].colour);
+            }
           }
           return nextGallery;
         });
 
         setFeedback(
           uploadedPhotos.length > 1
-            ? `${uploadedPhotos.length} product photos uploaded successfully!`
+            ? `${uploadedPhotos.length} product photos uploaded and mapped to color variants!`
             : data.mode === "cloudinary"
             ? "Picture uploaded & optimized on Cloudinary CDN (WebP/AVIF)!"
             : "Picture uploaded to local storage (/uploads)!",
@@ -1154,7 +1221,7 @@ export function AdminDashboard({
     setSize("180 × 70 cm");
     setImageSrc(photos.rose.src);
     setImageAlt(photos.rose.alt);
-    setGalleryPhotos([{ src: photos.rose.src, alt: photos.rose.alt }]);
+    setGalleryPhotos([{ src: photos.rose.src, alt: photos.rose.alt, colour: "rose" }]);
     setSections(["new-items"]);
   }
 
@@ -1178,19 +1245,27 @@ export function AdminDashboard({
     setImageAlt(product.photo.alt);
 
     const existingGallery: Photo[] = [];
-    if (product.photo?.src) {
-      existingGallery.push(product.photo);
-    }
-    const variantGallery = product.details?.variants?.[0]?.gallery ?? [];
-    for (const g of variantGallery) {
-      if (g?.src && !existingGallery.some((item) => item.src === g.src)) {
-        existingGallery.push(g);
+    for (const v of product.details?.variants ?? []) {
+      for (const p of v.gallery ?? []) {
+        if (p?.src && !existingGallery.some((item) => item.src === p.src)) {
+          existingGallery.push({
+            ...p,
+            colour: p.colour || v.colour,
+          });
+        }
       }
     }
+    if (product.photo?.src && !existingGallery.some((item) => item.src === product.photo.src)) {
+      existingGallery.unshift({
+        ...product.photo,
+        colour: product.colour,
+      });
+    }
+
     setGalleryPhotos(
       existingGallery.length > 0
         ? existingGallery
-        : [{ src: product.photo.src, alt: product.photo.alt }],
+        : [{ src: product.photo.src, alt: product.photo.alt, colour: product.colour }],
     );
 
     setSections(product.sections);
@@ -7136,6 +7211,32 @@ export function AdminDashboard({
                                   </span>
                                 )}
                               </div>
+                              <div className="adm-gallery-colour-bar">
+                                <span
+                                  className="adm-gallery-colour-dot"
+                                  style={{
+                                    background:
+                                      taxonomy.colours.find(
+                                        (c) => c.value === (photoItem.colour || colour),
+                                      )?.swatch || "#888",
+                                  }}
+                                  aria-hidden="true"
+                                />
+                                <select
+                                  value={photoItem.colour || colour}
+                                  onChange={(e) =>
+                                    handleSetPhotoColour(idx, e.target.value as ProductColour)
+                                  }
+                                  className="adm-gallery-colour-dropdown"
+                                  title="Assign this picture to a specific color variant"
+                                >
+                                  {taxonomy.colours.map((c) => (
+                                    <option key={c.value} value={c.value}>
+                                      {c.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
                               <div className="adm-gallery-card-actions">
                                 {!isPrimary ? (
                                   <button
@@ -7165,6 +7266,43 @@ export function AdminDashboard({
                           );
                         })}
                       </div>
+
+                      {(() => {
+                        const configuredColours = Array.from(
+                          new Set(galleryPhotos.map((p) => p.colour || colour)),
+                        );
+                        if (configuredColours.length > 1) {
+                          return (
+                            <div className="adm-gallery-colour-summary">
+                              <span className="adm-gallery-colour-summary-title">
+                                🎨 <strong>{configuredColours.length} Color Variants Configured:</strong>
+                              </span>
+                              <div className="adm-gallery-colour-pills">
+                                {configuredColours.map((colKey) => {
+                                  const meta = resolveColourMeta(colKey, taxonomy.colours);
+                                  const count = galleryPhotos.filter(
+                                    (p) => (p.colour || colour) === colKey,
+                                  ).length;
+                                  return (
+                                    <span key={colKey} className="adm-gallery-colour-pill">
+                                      <span
+                                        className="adm-gallery-colour-dot"
+                                        style={{ background: meta.swatch }}
+                                        aria-hidden="true"
+                                      />
+                                      {meta.label} ({count} photo{count > 1 ? "s" : ""})
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                              <span className="adm-hint">
+                                When a customer selects any of these colours on the product page, the main image will automatically switch to that colour&apos;s picture.
+                              </span>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
                     </div>
                   )}
                 </div>

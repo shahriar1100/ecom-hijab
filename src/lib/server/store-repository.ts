@@ -1316,6 +1316,7 @@ export async function upsertStoreProduct(input: AdminProductInput): Promise<{
   const photo: Photo = {
     src: input.imageSrc.trim(),
     alt: input.imageAlt.trim() || input.name.trim(),
+    colour,
     ...(input.imagePosition ? { position: input.imagePosition } : {}),
   };
 
@@ -1354,55 +1355,112 @@ export async function upsertStoreProduct(input: AdminProductInput): Promise<{
         )
       : [];
 
-  const resolvedGallery: [Photo, ...Photo[]] = (() => {
-    if (userGallery.length > 0) {
-      const remaining = userGallery.filter((p) => p.src !== photo.src);
-      return [photo, ...remaining];
-    }
-    const filteredGallery =
-      baseVariants[0]?.gallery?.filter(
-        (p) => p.src !== photo.src && p.src !== previousPrimarySrc,
-      ) ?? [];
-    return [photo, ...filteredGallery];
-  })();
+  // Group photos by their assigned colour variant
+  const photosByColour = new Map<ProductColour, Photo[]>();
+  photosByColour.set(colour, [photo]);
 
-  const updatedVariants = baseVariants.map((v, idx) => {
-    const customVariantStock = input.variantStocks?.[v.colour];
-    if (customVariantStock !== undefined) {
-      return {
-        ...v,
-        ...(idx === 0
-          ? {
-              customCategory: category,
-              customFabric: fabric,
-              customColour: colour,
-            }
-          : {}),
-        stock: Math.max(0, Math.round(Number(customVariantStock))),
-        gallery: idx === 0 ? resolvedGallery : v.gallery,
-      };
+  for (const p of userGallery) {
+    const assignedCol = (p.colour?.trim() || colour) as ProductColour;
+    const currentList = photosByColour.get(assignedCol) ?? [];
+    if (!currentList.some((item) => item.src === p.src.trim())) {
+      currentList.push({
+        src: p.src.trim(),
+        alt: p.alt?.trim() || `${input.name.trim()} - ${assignedCol}`,
+        colour: assignedCol,
+        ...(p.position ? { position: p.position } : {}),
+      });
     }
-    if (idx === 0 || v.colour === colour) {
-      return {
-        ...v,
-        colour: idx === 0 ? colour : v.colour,
-        ...(idx === 0
-          ? {
-              customCategory: category,
-              customFabric: fabric,
-              customColour: colour,
-            }
-          : {}),
-        stock: primaryStock,
-        gallery: resolvedGallery,
-      };
+    photosByColour.set(assignedCol, currentList);
+  }
+
+  const updatedVariants: [ProductVariant, ...ProductVariant[]] = (() => {
+    if (photosByColour.size > 1) {
+      // Multiple color variants explicitly configured by admin!
+      const orderedColours: ProductColour[] = [
+        colour,
+        ...Array.from(photosByColour.keys()).filter((c) => c !== colour),
+      ];
+
+      return orderedColours.map((col, idx) => {
+        const colPhotos = photosByColour.get(col) ?? [];
+        const variantGallery: [Photo, ...Photo[]] =
+          colPhotos.length > 0
+            ? (colPhotos as [Photo, ...Photo[]])
+            : ([photo] as [Photo, ...Photo[]]);
+
+        const existingVar = existing?.details.variants.find((v) => v.colour === col);
+        const customStock = input.variantStocks?.[col];
+        const resolvedStock =
+          customStock !== undefined
+            ? Math.max(0, Math.round(Number(customStock)))
+            : existingVar?.stock !== undefined
+            ? existingVar.stock
+            : primaryStock;
+
+        return {
+          colour: col,
+          stock: resolvedStock,
+          gallery: variantGallery,
+          ...(idx === 0
+            ? {
+                customCategory: category,
+                customFabric: fabric,
+                customColour: col,
+              }
+            : {}),
+        };
+      }) as [ProductVariant, ...ProductVariant[]];
     }
-    return v;
-  }) as [ProductVariant, ...ProductVariant[]];
+
+    // Single colour assigned: update primary variant gallery, preserve other baseVariants
+    const primaryGallery: [Photo, ...Photo[]] = (() => {
+      const colPhotos = photosByColour.get(colour) ?? [];
+      if (colPhotos.length > 0) return colPhotos as [Photo, ...Photo[]];
+      const filtered =
+        baseVariants[0]?.gallery?.filter(
+          (p) => p.src !== photo.src && p.src !== previousPrimarySrc,
+        ) ?? [];
+      return [photo, ...filtered];
+    })();
+
+    return baseVariants.map((v, idx) => {
+      const customVariantStock = input.variantStocks?.[v.colour];
+      if (customVariantStock !== undefined) {
+        return {
+          ...v,
+          ...(idx === 0
+            ? {
+                customCategory: category,
+                customFabric: fabric,
+                customColour: colour,
+              }
+            : {}),
+          stock: Math.max(0, Math.round(Number(customVariantStock))),
+          gallery: idx === 0 ? primaryGallery : v.gallery,
+        };
+      }
+      if (idx === 0 || v.colour === colour) {
+        return {
+          ...v,
+          colour: idx === 0 ? colour : v.colour,
+          ...(idx === 0
+            ? {
+                customCategory: category,
+                customFabric: fabric,
+                customColour: colour,
+              }
+            : {}),
+          stock: primaryStock,
+          gallery: primaryGallery,
+        };
+      }
+      return v;
+    }) as [ProductVariant, ...ProductVariant[]];
+  })();
 
   const totalStock = input.variantStocks
     ? sumVariantStocks(updatedVariants)
-    : primaryStock;
+    : updatedVariants.reduce((sum, v) => sum + v.stock, 0);
 
   const wasRestocked = existing ? totalStock > existing.stock : false;
 

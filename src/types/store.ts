@@ -2,6 +2,7 @@ export type Photo = {
   src: string;
   alt: string;
   position?: string;
+  colour?: ProductColour;
 };
 
 export type Product = {
