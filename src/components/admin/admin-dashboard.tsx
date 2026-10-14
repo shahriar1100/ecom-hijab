@@ -38,6 +38,7 @@ import {
   ShieldCheck,
   ShoppingBag,
   ShoppingCart,
+  Star,
   Tag,
   Trash2,
   Truck,
@@ -83,7 +84,7 @@ import type {
   ProductSectionKey,
   ProductStatus,
 } from "@/lib/server/store-repository";
-import type { Fabric, ProductCategory, ProductColour, Story } from "@/types/store";
+import type { Fabric, Photo, ProductCategory, ProductColour, Story } from "@/types/store";
 
 type PublicCustomerAccount = Omit<CustomerAccountRecord, "password">;
 
@@ -594,6 +595,9 @@ export function AdminDashboard({
   const [size, setSize] = useState("180 × 70 cm");
   const [imageSrc, setImageSrc] = useState(photos.rose.src);
   const [imageAlt, setImageAlt] = useState(photos.rose.alt);
+  const [galleryPhotos, setGalleryPhotos] = useState<Photo[]>([
+    { src: photos.rose.src, alt: photos.rose.alt },
+  ]);
   const [sections, setSections] = useState<ProductSectionKey[]>(["new-items"]);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [savingProduct, setSavingProduct] = useState(false);
@@ -1028,37 +1032,102 @@ export function AdminDashboard({
     setAuthenticated(false);
   }
 
+  function handleSetPrimaryPhoto(index: number) {
+    if (index <= 0 || index >= galleryPhotos.length) return;
+    const target = galleryPhotos[index];
+    const rest = galleryPhotos.filter((_, idx) => idx !== index);
+    const updated = [target, ...rest];
+    setGalleryPhotos(updated);
+    setImageSrc(target.src);
+    setImageAlt(target.alt || name || "Product photo");
+  }
+
+  function handleRemovePhoto(index: number) {
+    const updated = galleryPhotos.filter((_, idx) => idx !== index);
+    if (updated.length === 0) {
+      setGalleryPhotos([{ src: photos.rose.src, alt: photos.rose.alt }]);
+      setImageSrc(photos.rose.src);
+      setImageAlt(photos.rose.alt);
+    } else {
+      setGalleryPhotos(updated);
+      if (index === 0) {
+        setImageSrc(updated[0].src);
+        setImageAlt(updated[0].alt || name || "Product photo");
+      }
+    }
+  }
+
   async function handleFileSelect(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    const fileList = event.target.files;
+    if (!fileList || fileList.length === 0) return;
+    const files = Array.from(fileList);
     setUploadingImage(true);
     setFeedback("");
     try {
       const formData = new FormData();
-      formData.append("file", file);
-      if (imageSrc.trim()) {
-        formData.append("replaceUrl", imageSrc.trim());
+      for (const file of files) {
+        formData.append("file", file);
       }
       const res = await fetch("/api/admin/upload", {
         method: "POST",
         body: formData,
       });
-      const data = (await res.json()) as { url?: string; mode?: string; error?: string };
-      if (!res.ok || !data.url) {
-        setFeedback(`Upload error: ${data.error || "Failed to upload image"}`);
+      const data = (await res.json()) as {
+        url?: string;
+        urls?: string[];
+        photos?: Photo[];
+        mode?: string;
+        error?: string;
+      };
+      if (!res.ok || (!data.url && (!data.urls || data.urls.length === 0))) {
+        setFeedback(`Upload error: ${data.error || "Failed to upload image(s)"}`);
         return;
       }
-      setImageSrc(data.url);
-      if (!imageAlt || imageAlt === photos.rose.alt) {
-        setImageAlt(name ? `${name} studio product photo` : file.name.replace(/\.[^.]+$/, ""));
+
+      const uploadedPhotos: Photo[] = [];
+      if (Array.isArray(data.photos) && data.photos.length > 0) {
+        for (const p of data.photos) {
+          if (p?.src) uploadedPhotos.push(p);
+        }
+      } else if (Array.isArray(data.urls) && data.urls.length > 0) {
+        for (let i = 0; i < data.urls.length; i++) {
+          const u = data.urls[i];
+          const fname =
+            files[i]?.name?.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ") ||
+            (name ? `${name} photo ${i + 1}` : "Product photo");
+          uploadedPhotos.push({ src: u, alt: fname });
+        }
+      } else if (data.url) {
+        const fname =
+          files[0]?.name?.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ") ||
+          (name ? `${name} studio product photo` : "Product photo");
+        uploadedPhotos.push({ src: data.url, alt: fname });
       }
-      setFeedback(
-        data.mode === "cloudinary"
-          ? "Picture uploaded & optimized on Cloudinary CDN (WebP/AVIF)!"
-          : "Picture uploaded to local storage (/uploads)!",
-      );
+
+      if (uploadedPhotos.length > 0) {
+        setGalleryPhotos((prev) => {
+          const isInitialDefault =
+            prev.length === 1 && prev[0].src === photos.rose.src;
+          const nextGallery = isInitialDefault
+            ? uploadedPhotos
+            : [...prev, ...uploadedPhotos];
+          if (nextGallery[0]) {
+            setImageSrc(nextGallery[0].src);
+            setImageAlt(nextGallery[0].alt || name || "Product photo");
+          }
+          return nextGallery;
+        });
+
+        setFeedback(
+          uploadedPhotos.length > 1
+            ? `${uploadedPhotos.length} product photos uploaded successfully!`
+            : data.mode === "cloudinary"
+            ? "Picture uploaded & optimized on Cloudinary CDN (WebP/AVIF)!"
+            : "Picture uploaded to local storage (/uploads)!",
+        );
+      }
     } catch {
-      setFeedback("Failed to upload image file.");
+      setFeedback("Failed to upload image file(s).");
     } finally {
       setUploadingImage(false);
       event.target.value = "";
@@ -1085,6 +1154,7 @@ export function AdminDashboard({
     setSize("180 × 70 cm");
     setImageSrc(photos.rose.src);
     setImageAlt(photos.rose.alt);
+    setGalleryPhotos([{ src: photos.rose.src, alt: photos.rose.alt }]);
     setSections(["new-items"]);
   }
 
@@ -1106,6 +1176,23 @@ export function AdminDashboard({
     setSize(product.details.size);
     setImageSrc(product.photo.src);
     setImageAlt(product.photo.alt);
+
+    const existingGallery: Photo[] = [];
+    if (product.photo?.src) {
+      existingGallery.push(product.photo);
+    }
+    const variantGallery = product.details?.variants?.[0]?.gallery ?? [];
+    for (const g of variantGallery) {
+      if (g?.src && !existingGallery.some((item) => item.src === g.src)) {
+        existingGallery.push(g);
+      }
+    }
+    setGalleryPhotos(
+      existingGallery.length > 0
+        ? existingGallery
+        : [{ src: product.photo.src, alt: product.photo.alt }],
+    );
+
     setSections(product.sections);
     setActiveSection("products");
     setShowProductFormModal(true);
@@ -1168,6 +1255,7 @@ export function AdminDashboard({
       size: size.trim(),
       imageSrc: imageSrc.trim(),
       imageAlt: imageAlt.trim() || name.trim(),
+      galleryImages: galleryPhotos.filter((p) => p.src.trim().length > 0),
       sections,
     };
 
@@ -7002,10 +7090,11 @@ export function AdminDashboard({
             <div className="adm-modal-body adm-product-editor-grid">
               <form className="adm-form-stack" onSubmit={handleSaveProduct}>
                 <div className="adm-field">
-                  <label>Product Picture (Cloudinary CDN / Direct Upload)</label>
+                  <label>Product Pictures &amp; Gallery (Select multiple photos supported)</label>
                   <label className="adm-upload-dropzone">
                     <input
                       type="file"
+                      multiple
                       accept="image/jpeg,image/png,image/webp,image/avif"
                       onChange={handleFileSelect}
                       disabled={uploadingImage}
@@ -7013,48 +7102,105 @@ export function AdminDashboard({
                     <ImagePlus size={24} />
                     <strong>
                       {uploadingImage
-                        ? "Uploading & optimizing picture…"
-                        : "Click to upload picture (JPG, PNG, WebP, AVIF)"}
+                        ? "Uploading & optimizing picture(s)…"
+                        : "Click to select & upload pictures (Multi-image supported · JPG, PNG, WebP, AVIF)"}
                     </strong>
-                    <span>Auto-compressed via Cloudinary CDN</span>
+                    <span>Auto-compressed via Cloudinary CDN · Optimized for instant fast loading</span>
                   </label>
-                  <div className="adm-preset-row">
-                    {PRESET_PHOTOS.map((item) => (
-                      <button
-                        key={item.label}
-                        type="button"
-                        className="adm-preset-chip"
-                        onClick={() => {
-                          setImageSrc(item.photo.src);
-                          setImageAlt(item.photo.alt);
-                        }}
-                      >
-                        {item.label}
-                      </button>
-                    ))}
-                  </div>
+
+                  {galleryPhotos.length > 0 && (
+                    <div className="adm-gallery-manager">
+                      <div className="adm-gallery-header">
+                        <span>
+                          Product Photos (<strong>{galleryPhotos.length}</strong> photo{galleryPhotos.length > 1 ? "s" : ""}) · First photo is featured card display
+                        </span>
+                      </div>
+                      <div className="adm-gallery-grid">
+                        {galleryPhotos.map((photoItem, idx) => {
+                          const isPrimary = idx === 0;
+                          return (
+                            <div
+                              key={`${photoItem.src}-${idx}`}
+                              className={`adm-gallery-card ${isPrimary ? "is-primary" : ""}`}
+                            >
+                              <div className="adm-gallery-thumb-wrap">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={photoItem.src}
+                                  alt={photoItem.alt || `Photo ${idx + 1}`}
+                                  className="adm-gallery-thumb"
+                                />
+                                {isPrimary && (
+                                  <span className="adm-gallery-badge-primary">
+                                    <Star size={10} fill="currentColor" /> Primary
+                                  </span>
+                                )}
+                              </div>
+                              <div className="adm-gallery-card-actions">
+                                {!isPrimary ? (
+                                  <button
+                                    type="button"
+                                    className="adm-gallery-btn-primary"
+                                    onClick={() => handleSetPrimaryPhoto(idx)}
+                                    title="Set as featured main photo"
+                                  >
+                                    Make Primary
+                                  </button>
+                                ) : (
+                                  <span style={{ fontSize: "10px", fontWeight: 700, color: "#0f766e" }}>
+                                    ⭐ Main
+                                  </span>
+                                )}
+                                <button
+                                  type="button"
+                                  className="adm-gallery-btn-delete"
+                                  onClick={() => handleRemovePhoto(idx)}
+                                  title="Remove photo"
+                                  aria-label="Remove photo"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="adm-form-row-2">
                   <div className="adm-field">
-                    <label htmlFor="mod-img-src">Image URL</label>
+                    <label htmlFor="mod-img-src">Primary Image URL</label>
                     <input
                       id="mod-img-src"
                       type="text"
                       className="adm-input"
                       value={imageSrc}
-                      onChange={(e) => setImageSrc(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setImageSrc(val);
+                        setGalleryPhotos((prev) =>
+                          prev.map((p, idx) => (idx === 0 ? { ...p, src: val } : p)),
+                        );
+                      }}
                       required
                     />
                   </div>
                   <div className="adm-field">
-                    <label htmlFor="mod-img-alt">Image Alt Text</label>
+                    <label htmlFor="mod-img-alt">Primary Image Alt Text</label>
                     <input
                       id="mod-img-alt"
                       type="text"
                       className="adm-input"
                       value={imageAlt}
-                      onChange={(e) => setImageAlt(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setImageAlt(val);
+                        setGalleryPhotos((prev) =>
+                          prev.map((p, idx) => (idx === 0 ? { ...p, alt: val } : p)),
+                        );
+                      }}
                       required
                     />
                   </div>

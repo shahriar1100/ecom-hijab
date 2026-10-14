@@ -66,6 +66,7 @@ export type AdminProductInput = {
   imageSrc: string;
   imageAlt: string;
   imagePosition?: string;
+  galleryImages?: Photo[];
   sections: ProductSectionKey[];
   variantStocks?: Partial<Record<ProductColour, number>>;
 };
@@ -1346,10 +1347,26 @@ export async function upsertStoreProduct(input: AdminProductInput): Promise<{
   const baseVariants = existing?.details.variants ?? baseDetails.variants;
   const primaryStock = Math.max(0, Math.round(Number(input.stock ?? 10)));
 
+  const userGallery: Photo[] =
+    Array.isArray(input.galleryImages) && input.galleryImages.length > 0
+      ? input.galleryImages.filter(
+          (p) => p && typeof p.src === "string" && p.src.trim().length > 0,
+        )
+      : [];
+
+  const resolvedGallery: [Photo, ...Photo[]] = (() => {
+    if (userGallery.length > 0) {
+      const remaining = userGallery.filter((p) => p.src !== photo.src);
+      return [photo, ...remaining];
+    }
+    const filteredGallery =
+      baseVariants[0]?.gallery?.filter(
+        (p) => p.src !== photo.src && p.src !== previousPrimarySrc,
+      ) ?? [];
+    return [photo, ...filteredGallery];
+  })();
+
   const updatedVariants = baseVariants.map((v, idx) => {
-    const filteredGallery = v.gallery.filter(
-      (p) => p.src !== photo.src && p.src !== previousPrimarySrc,
-    );
     const customVariantStock = input.variantStocks?.[v.colour];
     if (customVariantStock !== undefined) {
       return {
@@ -1362,10 +1379,7 @@ export async function upsertStoreProduct(input: AdminProductInput): Promise<{
             }
           : {}),
         stock: Math.max(0, Math.round(Number(customVariantStock))),
-        gallery:
-          idx === 0
-            ? ([photo, ...filteredGallery] as [Photo, ...Photo[]])
-            : v.gallery,
+        gallery: idx === 0 ? resolvedGallery : v.gallery,
       };
     }
     if (idx === 0 || v.colour === colour) {
@@ -1380,7 +1394,7 @@ export async function upsertStoreProduct(input: AdminProductInput): Promise<{
             }
           : {}),
         stock: primaryStock,
-        gallery: [photo, ...filteredGallery] as [Photo, ...Photo[]],
+        gallery: resolvedGallery,
       };
     }
     return v;
