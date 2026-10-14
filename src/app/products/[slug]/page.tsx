@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { CheckCircle2, ChevronRight, MessageSquare, Star, Truck } from "lucide-react";
+import { CheckCircle2, ChevronRight, MessageSquare, Star } from "lucide-react";
 import { catalogProducts, findProductBySlug } from "@/data/catalog";
 import { formatPrice } from "@/data/store";
 import {
@@ -73,7 +73,6 @@ export default async function ProductPage({ params }: Props) {
         ).toFixed(1)
       : null;
 
-  const discount = product.originalPrice ? Math.round((1 - product.price / product.originalPrice) * 100) : 0;
   const others = allProducts.filter((item) => item.id !== product.id);
   const sameFabric = others.filter((item) => item.category === product.category && item.fabric && item.fabric === product.fabric);
   const sameCat = others.filter((item) => item.category === product.category && !sameFabric.includes(item));
@@ -89,12 +88,15 @@ export default async function ProductPage({ params }: Props) {
         productId={product.id}
         name={product.name}
         price={product.price}
+        originalPrice={product.originalPrice}
         category={product.category}
+        fabric={product.fabric}
+        description={product.details.description}
+        material={product.details.material}
+        size={product.details.size}
+        deliveryNote={product.details.deliveryNote}
         variants={product.details.variants}
         customColours={settings.taxonomy.colours}
-        summary={<div className="product-summary"><p className="product-eyebrow">NOOR · EVERYDAY ELEGANCE</p><h1>{product.name}</h1><div className="product-detail-prices"><span className="product-detail-price">{formatPrice(product.price)}</span>{product.originalPrice && <del><span className="sr-only">Original price </span>{formatPrice(product.originalPrice)}</del>}{discount > 0 && <span className="product-saving">Save {discount}%</span>}<span className="product-currency">BDT</span></div><p className="product-description">{product.details.description}</p></div>}
-        specifications={<dl className="product-specifications"><div><dt>{product.fabric ? "Fabric" : "Material"}</dt><dd>{product.details.material}</dd></div><div><dt>Size</dt><dd>{product.details.size}</dd></div></dl>}
-        delivery={<div className="product-delivery"><Truck size={22} aria-hidden="true" /><div><h2>Delivery</h2><p>{product.details.deliveryNote}</p></div></div>}
       />
 
       {/* Customer Reviews Section */}

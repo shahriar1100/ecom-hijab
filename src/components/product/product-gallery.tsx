@@ -6,7 +6,14 @@ import type { ProductVariant } from "@/types/store";
 import { ProductPhoto } from "./product-photo";
 
 export function ProductGallery({ photos, name }: { photos: ProductVariant["gallery"]; name: string }) {
+  const [prevPhotos, setPrevPhotos] = useState(photos);
   const [index, setIndex] = useState(0);
+
+  if (photos !== prevPhotos) {
+    setPrevPhotos(photos);
+    setIndex(0);
+  }
+
   const photo = photos[index] ?? photos[0];
 
   return <section className="product-gallery" aria-label={`${name} image gallery`}>
