@@ -63,3 +63,10 @@ export type Story = {
 
 export type Category = { id: string; name: string; photo: Photo; href: string };
 export type NavItem = { label: string; href?: string; feature?: string };
+
+export type FacebookPixelConfig = {
+  pixelId: string;
+  enabled: boolean;
+  testMode?: boolean;
+  lastVerifiedAt?: string | null;
+};

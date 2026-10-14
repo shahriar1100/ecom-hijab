@@ -63,6 +63,7 @@ import {
   SalesAnalyticsChart,
 } from "./admin-charts";
 import { AdminKpiGrid } from "./admin-kpi-grid";
+import { trackTestPing } from "@/lib/fpixel";
 import type {
   DashboardAnalyticsResponse,
   DateRangePreset,
@@ -648,6 +649,28 @@ export function AdminDashboard({
   );
   const [savingSettings, setSavingSettings] = useState(false);
 
+  // Facebook / Meta Pixel Configuration State
+  const [fbPixelId, setFbPixelId] = useState(
+    analytics.settings.facebookPixel?.pixelId ?? "",
+  );
+  const [fbPixelEnabled, setFbPixelEnabled] = useState(
+    analytics.settings.facebookPixel?.enabled ?? true,
+  );
+  const [fbPixelTestMode, setFbPixelTestMode] = useState(
+    analytics.settings.facebookPixel?.testMode ?? false,
+  );
+  const [fbPixelVerifiedAt, setFbPixelVerifiedAt] = useState<string | null>(
+    analytics.settings.facebookPixel?.lastVerifiedAt ?? null,
+  );
+  const [fbVerifying, setFbVerifying] = useState(false);
+  const [fbVerifyResult, setFbVerifyResult] = useState<{
+    ok: boolean;
+    message: string;
+    testEventsUrl?: string;
+  } | null>(null);
+  const [fbSendingTestPing, setFbSendingTestPing] = useState(false);
+  const [fbTestPingSent, setFbTestPingSent] = useState(false);
+
   // Hero Banner Carousel Editor State (3 Slides)
   const [heroSlides, setHeroSlides] = useState<
     [HeroBannerConfig, HeroBannerConfig, HeroBannerConfig]
@@ -789,6 +812,12 @@ export function AdminDashboard({
             setInstagramUrlInput(s.socialLinks.instagram ?? "");
             setYoutubeUrlInput(s.socialLinks.youtube ?? "");
             setTiktokUrlInput(s.socialLinks.tiktok ?? "");
+          }
+          if (s.facebookPixel) {
+            setFbPixelId(s.facebookPixel.pixelId ?? "");
+            setFbPixelEnabled(s.facebookPixel.enabled ?? true);
+            setFbPixelTestMode(s.facebookPixel.testMode ?? false);
+            setFbPixelVerifiedAt(s.facebookPixel.lastVerifiedAt ?? null);
           }
           if (s.heroSlides || s.heroBanner) {
             setHeroSlides(buildHeroSlidesState(s.heroSlides, s.heroBanner));
@@ -1395,15 +1424,103 @@ export function AdminDashboard({
             youtube: youtubeUrlInput.trim(),
             tiktok: tiktokUrlInput.trim(),
           },
+          facebookPixel: {
+            pixelId: fbPixelId.trim().replace(/[^\d]/g, ""),
+            enabled: fbPixelEnabled,
+            testMode: fbPixelTestMode,
+            lastVerifiedAt: fbPixelVerifiedAt,
+          },
         }),
       });
       if (res.ok) {
         await fetchAnalyticsData();
-        setFeedback("Store settings, contact info & social links saved!");
+        setFeedback("Store settings & Meta Pixel configuration saved!");
       }
     } finally {
       setSavingSettings(false);
     }
+  }
+
+  async function handleSaveMetaPixel() {
+    setSavingSettings(true);
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          facebookPixel: {
+            pixelId: fbPixelId.trim().replace(/[^\d]/g, ""),
+            enabled: fbPixelEnabled,
+            testMode: fbPixelTestMode,
+            lastVerifiedAt: fbPixelVerifiedAt,
+          },
+        }),
+      });
+      if (res.ok) {
+        await fetchAnalyticsData();
+        setFeedback("Meta Pixel configuration saved successfully!");
+      }
+    } finally {
+      setSavingSettings(false);
+    }
+  }
+
+  async function handleVerifyFacebookPixel() {
+    const cleanId = fbPixelId.trim().replace(/[^\d]/g, "");
+    if (!cleanId) {
+      setFbVerifyResult({
+        ok: false,
+        message: "Please enter your 14–17 digit Meta Pixel ID before verifying.",
+      });
+      return;
+    }
+    setFbVerifying(true);
+    setFbVerifyResult(null);
+    try {
+      const res = await fetch("/api/admin/pixel/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pixelId: cleanId,
+          enabled: fbPixelEnabled,
+          testMode: fbPixelTestMode,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        setFbPixelId(data.pixelId);
+        setFbPixelVerifiedAt(data.verifiedAt);
+        setFbVerifyResult({
+          ok: true,
+          message: data.message || "Meta Pixel ID verified successfully!",
+          testEventsUrl: data.testEventsUrl,
+        });
+        await fetchAnalyticsData();
+      } else {
+        setFbVerifyResult({
+          ok: false,
+          message: data.error || "Failed to verify Meta Pixel ID.",
+        });
+      }
+    } catch {
+      setFbVerifyResult({
+        ok: false,
+        message: "Network error while connecting to Meta verification API.",
+      });
+    } finally {
+      setFbVerifying(false);
+    }
+  }
+
+  function handleSendTestPing() {
+    if (!fbPixelId.trim()) return;
+    setFbSendingTestPing(true);
+    trackTestPing(fbPixelId.trim());
+    setTimeout(() => {
+      setFbSendingTestPing(false);
+      setFbTestPingSent(true);
+      setTimeout(() => setFbTestPingSent(false), 5000);
+    }, 400);
   }
 
   async function persistHeroSlidesToServer(
@@ -6318,7 +6435,8 @@ export function AdminDashboard({
 
           {/* ================= 14. SETTINGS SECTION ================= */}
           {activeSection === "settings" && (
-            <div className="adm-grid-2">
+            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+              <div className="adm-grid-2">
               <div className="adm-panel">
                 <div className="adm-panel-head">
                   <div>
@@ -6585,7 +6703,277 @@ export function AdminDashboard({
                 </div>
               </div>
             </div>
-          )}
+
+            {/* Meta (Facebook) Pixel & Conversion Tracking Panel */}
+            <div className="adm-panel" id="meta-pixel-settings">
+              <div className="adm-panel-head">
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                    <h3 style={{ margin: 0 }}>Meta (Facebook) Pixel &amp; Conversion Tracking</h3>
+                    <span
+                      className={`adm-status-pill ${
+                        !fbPixelId.trim()
+                          ? "is-warning"
+                          : fbPixelEnabled
+                            ? "is-success"
+                            : "is-danger"
+                      }`}
+                    >
+                      {!fbPixelId.trim()
+                        ? "⚪ Pixel Not Configured"
+                        : fbPixelEnabled
+                          ? "🟢 Active & Tracking"
+                          : "🟡 Tracking Paused"}
+                    </span>
+                    {fbPixelTestMode && fbPixelEnabled && (
+                      <span
+                        className="adm-status-pill is-warning"
+                        style={{ fontSize: 11 }}
+                        title="Diagnostic test badge is visible on storefront"
+                      >
+                        🧪 Storefront Test Mode On
+                      </span>
+                    )}
+                  </div>
+                  <p className="adm-panel-sub" style={{ marginTop: 4 }}>
+                    Add your Meta Pixel ID to automatically track storefront visitors, product views, add-to-carts, checkouts, and purchases in Meta Events Manager &amp; Ads Manager.
+                  </p>
+                </div>
+              </div>
+
+              <div className="adm-form-stack" style={{ gap: 18 }}>
+                <div className="adm-form-row-2">
+                  <div className="adm-field">
+                    <label htmlFor="fb-pixel-id">
+                      <strong>Meta Pixel ID (14–17 Digits)</strong>
+                    </label>
+                    <input
+                      id="fb-pixel-id"
+                      type="text"
+                      className="adm-input"
+                      placeholder="e.g. 182736455291048"
+                      value={fbPixelId}
+                      onChange={(e) => setFbPixelId(e.target.value.replace(/[^\d]/g, ""))}
+                    />
+                    <span style={{ fontSize: 11, color: "var(--muted)", marginTop: 2, display: "block" }}>
+                      Enter your numeric Pixel ID. Found in Meta Business Suite → Events Manager → Data Sources.
+                    </span>
+                  </div>
+
+                  <div className="adm-field" style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: 10 }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontWeight: 600 }}>
+                      <input
+                        type="checkbox"
+                        checked={fbPixelEnabled}
+                        onChange={(e) => setFbPixelEnabled(e.target.checked)}
+                        style={{ width: 17, height: 17, accentColor: "#1877f2" }}
+                      />
+                      <span>Enable Meta Pixel Tracking on Storefront</span>
+                    </label>
+                    <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 12, color: "var(--muted)" }}>
+                      <input
+                        type="checkbox"
+                        checked={fbPixelTestMode}
+                        onChange={(e) => setFbPixelTestMode(e.target.checked)}
+                        style={{ width: 15, height: 15 }}
+                      />
+                      <span>Diagnostic / Test Mode (logs events in browser console &amp; displays floating pill on storefront)</span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Verification & Live Connection Toolbar */}
+                <div
+                  style={{
+                    background: "var(--surface-sunken, #f8fafc)",
+                    borderRadius: 10,
+                    padding: "16px 18px",
+                    border: "1px solid var(--line)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 12,
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+                    <div>
+                      <strong style={{ fontSize: 13, display: "block" }}>
+                        Connection Verification &amp; Diagnostics
+                      </strong>
+                      <span style={{ fontSize: 12, color: "var(--muted)" }}>
+                        {fbPixelVerifiedAt
+                          ? `Last verified: ${new Date(fbPixelVerifiedAt).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}`
+                          : "Status: Not verified yet. Click 'Verify Connection' to check."}
+                      </span>
+                    </div>
+
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      <button
+                        type="button"
+                        className="adm-btn adm-btn-secondary"
+                        onClick={handleVerifyFacebookPixel}
+                        disabled={fbVerifying || !fbPixelId.trim()}
+                      >
+                        <RefreshCw size={14} className={fbVerifying ? "adm-spin" : ""} />
+                        {fbVerifying ? "Verifying with Meta…" : "Verify Connection"}
+                      </button>
+
+                      <button
+                        type="button"
+                        className="adm-btn adm-btn-secondary"
+                        onClick={handleSendTestPing}
+                        disabled={fbSendingTestPing || !fbPixelId.trim()}
+                        title="Dispatches a test event in this browser window to ensure Meta script executes"
+                      >
+                        <Activity size={14} />
+                        {fbTestPingSent ? "✓ Test Sent!" : fbSendingTestPing ? "Sending…" : "Send Test Ping"}
+                      </button>
+
+                      {fbPixelId.trim() && (
+                        <a
+                          href={`https://business.facebook.com/events_manager2/list/pixel/${fbPixelId.trim()}/test_events`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="adm-btn adm-btn-secondary"
+                          style={{ display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none" }}
+                        >
+                          <span>Meta Events Manager</span>
+                          <ExternalLink size={13} />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Verification Result Feedback Alert */}
+                  {fbVerifyResult && (
+                    <div
+                      style={{
+                        padding: "12px 14px",
+                        borderRadius: 8,
+                        fontSize: 12,
+                        display: "flex",
+                        alignItems: "flex-start",
+                        gap: 10,
+                        background: fbVerifyResult.ok ? "rgba(34, 197, 94, 0.12)" : "rgba(239, 68, 68, 0.12)",
+                        border: `1px solid ${fbVerifyResult.ok ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"}`,
+                        color: fbVerifyResult.ok ? "#166534" : "#991b1b",
+                      }}
+                    >
+                      {fbVerifyResult.ok ? (
+                        <CheckCircle2 size={16} style={{ flexShrink: 0, marginTop: 1 }} />
+                      ) : (
+                        <AlertCircle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
+                      )}
+                      <div>
+                        <strong>{fbVerifyResult.ok ? "Connection Status: Connected & Verified ✓" : "Verification Notice"}</strong>
+                        <p style={{ margin: "3px 0 0" }}>{fbVerifyResult.message}</p>
+                        {fbVerifyResult.testEventsUrl && (
+                          <a
+                            href={fbVerifyResult.testEventsUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ display: "inline-flex", alignItems: "center", gap: 4, marginTop: 5, fontWeight: 600, color: "inherit", textDecoration: "underline" }}
+                          >
+                            Open Meta Test Events Dashboard to see live events →
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Standard Events Tracked Breakdown */}
+                <div>
+                  <h4 style={{ margin: "8px 0 10px", fontSize: 13 }}>
+                    Configured E-Commerce Tracking Events
+                  </h4>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
+                      gap: 10,
+                    }}
+                  >
+                    <div style={{ padding: "12px 14px", border: "1px solid var(--line)", borderRadius: 8, background: "var(--surface)" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                        <Check size={14} style={{ color: "#22c55e" }} />
+                        <strong style={{ fontSize: 12 }}>PageView</strong>
+                      </div>
+                      <span style={{ fontSize: 11, color: "var(--muted)", lineHeight: 1.4, display: "block" }}>
+                        Fired automatically on every page load and Next.js client-side route navigation.
+                      </span>
+                    </div>
+
+                    <div style={{ padding: "12px 14px", border: "1px solid var(--line)", borderRadius: 8, background: "var(--surface)" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                        <Check size={14} style={{ color: "#22c55e" }} />
+                        <strong style={{ fontSize: 12 }}>ViewContent</strong>
+                      </div>
+                      <span style={{ fontSize: 11, color: "var(--muted)", lineHeight: 1.4, display: "block" }}>
+                        Fired when a customer views any product page with product ID, name, price, and currency (BDT).
+                      </span>
+                    </div>
+
+                    <div style={{ padding: "12px 14px", border: "1px solid var(--line)", borderRadius: 8, background: "var(--surface)" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                        <Check size={14} style={{ color: "#22c55e" }} />
+                        <strong style={{ fontSize: 12 }}>AddToCart</strong>
+                      </div>
+                      <span style={{ fontSize: 11, color: "var(--muted)", lineHeight: 1.4, display: "block" }}>
+                        Fired when adding an item to the shopping bag with selected colour, price, and quantity.
+                      </span>
+                    </div>
+
+                    <div style={{ padding: "12px 14px", border: "1px solid var(--line)", borderRadius: 8, background: "var(--surface)" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                        <Check size={14} style={{ color: "#22c55e" }} />
+                        <strong style={{ fontSize: 12 }}>InitiateCheckout</strong>
+                      </div>
+                      <span style={{ fontSize: 11, color: "var(--muted)", lineHeight: 1.4, display: "block" }}>
+                        Fired when customer arrives at the checkout page with cart item count and order subtotal.
+                      </span>
+                    </div>
+
+                    <div style={{ padding: "12px 14px", border: "1px solid var(--line)", borderRadius: 8, background: "var(--surface)" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                        <Check size={14} style={{ color: "#22c55e" }} />
+                        <strong style={{ fontSize: 12 }}>Purchase</strong>
+                      </div>
+                      <span style={{ fontSize: 11, color: "var(--muted)", lineHeight: 1.4, display: "block" }}>
+                        Fired immediately when an order is placed with order ID, total amount in BDT, and item count.
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Actions & Verification Tips */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    flexWrap: "wrap",
+                    gap: 12,
+                    paddingTop: 8,
+                    borderTop: "1px solid var(--line)",
+                  }}
+                >
+                  <div style={{ fontSize: 12, color: "var(--muted)", maxWidth: 600 }}>
+                    💡 <strong>Pixel Verification Tip:</strong> Install the official <strong>Meta Pixel Helper</strong> Chrome Extension. When you visit any page on your store, the extension icon will turn blue with a green checkmark showing live events received.
+                  </div>
+
+                  <button
+                    type="button"
+                    className="adm-btn adm-btn-primary"
+                    onClick={handleSaveMetaPixel}
+                    disabled={savingSettings}
+                  >
+                    {savingSettings ? "Saving…" : "Save Meta Pixel Settings"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         </div>
       </div>
 

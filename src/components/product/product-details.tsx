@@ -1,18 +1,21 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowUpRight, Minus, Plus, ShoppingBag } from "lucide-react";
 import type { ProductVariant } from "@/types/store";
 import { resolveColourMeta, type ColourOption } from "@/data/shop-options";
 import { announceNotice } from "@/components/ui/coming-soon";
 import { addProductToCart } from "@/lib/cart-products";
+import { trackViewContent } from "@/lib/fpixel";
 import { ProductGallery } from "./product-gallery";
 import { SaveProductButton } from "./save-product-button";
 
 export function ProductDetails({
   productId,
   name,
+  price,
+  category,
   variants,
   summary,
   specifications,
@@ -21,6 +24,8 @@ export function ProductDetails({
 }: {
   productId: string;
   name: string;
+  price?: number;
+  category?: string;
   variants: [ProductVariant, ...ProductVariant[]];
   summary: ReactNode;
   specifications: ReactNode;
@@ -28,6 +33,16 @@ export function ProductDetails({
   customColours?: ColourOption[];
 }) {
   const router = useRouter();
+
+  // Meta Pixel: Track ViewContent for product
+  useEffect(() => {
+    trackViewContent({
+      id: productId,
+      name,
+      price: price || 0,
+      category,
+    });
+  }, [productId, name, price, category]);
   const [selectedColour, setSelectedColour] = useState(variants[0].colour);
   const [quantity, setQuantity] = useState(1);
   const [cartNotice, setCartNotice] = useState(false);

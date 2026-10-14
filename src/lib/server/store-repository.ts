@@ -18,6 +18,7 @@ import type {
   ProductColour,
   ProductVariant,
   Story,
+  FacebookPixelConfig,
 } from "@/types/store";
 import {
   deleteUploadedMedia,
@@ -161,6 +162,7 @@ export type AdminSettingsRecord = {
   flashSale: FlashSaleConfig;
   taxonomy: CatalogTaxonomy;
   stories: Story[];
+  facebookPixel?: FacebookPixelConfig;
 };
 
 export type AdminActivityRecord = {
@@ -327,6 +329,16 @@ export function isFlashSaleActive(config?: FlashSaleConfig | null): boolean {
   return true;
 }
 
+export function normalizeFacebookPixel(raw?: Partial<FacebookPixelConfig> | null): FacebookPixelConfig {
+  const pixelId = String(raw?.pixelId ?? "").trim().replace(/[^\d]/g, "");
+  return {
+    pixelId,
+    enabled: Boolean(raw?.enabled && pixelId.length >= 10),
+    testMode: Boolean(raw?.testMode),
+    lastVerifiedAt: raw?.lastVerifiedAt ? String(raw.lastVerifiedAt) : null,
+  };
+}
+
 const DEFAULT_SETTINGS: AdminSettingsRecord = {
   storeName: "NOOR Hijab & Modest Wear",
   timezone: "Asia/Dhaka",
@@ -349,6 +361,12 @@ const DEFAULT_SETTINGS: AdminSettingsRecord = {
   flashSale: DEFAULT_FLASH_SALE,
   taxonomy: DEFAULT_CATALOG_TAXONOMY,
   stories: defaultStories,
+  facebookPixel: {
+    pixelId: "",
+    enabled: false,
+    testMode: false,
+    lastVerifiedAt: null,
+  },
 };
 
 function generateSku(
@@ -2526,6 +2544,7 @@ async function fetchStoreSettingsFromSource(): Promise<AdminSettingsRecord> {
             },
             taxonomy: normalizeTaxonomy(parsed.taxonomy ?? local.settings.taxonomy, local.products),
             stories: normalizeStories(parsed.stories ?? local.settings.stories),
+            facebookPixel: normalizeFacebookPixel(parsed.facebookPixel ?? local.settings.facebookPixel),
           };
         }
       }
@@ -2561,6 +2580,7 @@ async function fetchStoreSettingsFromSource(): Promise<AdminSettingsRecord> {
     },
     taxonomy: normalizeTaxonomy(local.settings.taxonomy, local.products),
     stories: normalizeStories(local.settings.stories),
+    facebookPixel: normalizeFacebookPixel(local.settings.facebookPixel),
   };
 }
 
@@ -2652,6 +2672,9 @@ export async function updateStoreSettings(
     },
     taxonomy: normalizeTaxonomy(patch.taxonomy ?? currentSettings.taxonomy, local.products),
     stories: normalizeStories(patch.stories ?? currentSettings.stories),
+    facebookPixel: normalizeFacebookPixel(
+      patch.facebookPixel !== undefined ? patch.facebookPixel : currentSettings.facebookPixel,
+    ),
   };
 
   local.settings = nextSettings;

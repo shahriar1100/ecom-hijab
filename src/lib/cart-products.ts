@@ -93,7 +93,7 @@ export function addProductToCart(id: string, quantity = 1, colour?: string) {
   const amount = Math.max(1, Math.min(Math.floor(quantity), 99));
   const cleanColour = colour?.trim() || undefined;
   const match = current.items.find((item) => item.id === cleanId);
-  return write(
+  const result = write(
     match
       ? current.items.map((item) =>
           item.id === cleanId
@@ -113,6 +113,16 @@ export function addProductToCart(id: string, quantity = 1, colour?: string) {
           ...current.items,
         ],
   );
+
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent("noor:cart-product-added", {
+        detail: { id: cleanId, quantity: amount, colour: cleanColour },
+      }),
+    );
+  }
+
+  return result;
 }
 
 export function setCartQuantity(id: string, quantity: number) {

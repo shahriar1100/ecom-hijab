@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
+import { trackInitiateCheckout, trackPurchase } from "@/lib/fpixel";
 import {
   ArrowLeft,
   BellRing,
@@ -133,6 +134,16 @@ export function CheckoutContent({
   const discountAmount = appliedCoupon?.discountAmount ?? 0;
   const shippingFee = DELIVERY_FEES[deliveryZone].fee;
   const total = Math.max(0, subtotal - discountAmount + shippingFee);
+
+  // Meta Pixel: Track InitiateCheckout when user lands on checkout with items
+  const hasTrackedCheckoutRef = useRef(false);
+  useEffect(() => {
+    if (ready && rows.length > 0 && !confirmedOrder && !hasTrackedCheckoutRef.current) {
+      hasTrackedCheckoutRef.current = true;
+      const totalUnits = rows.reduce((sum, r) => sum + r.quantity, 0);
+      trackInitiateCheckout(totalUnits, subtotal);
+    }
+  }, [ready, rows, subtotal, confirmedOrder]);
 
   async function handleApplyCoupon() {
     if (!couponInput.trim()) return;
@@ -560,6 +571,13 @@ export function CheckoutContent({
       shippingFee,
       total,
       status: "Pending",
+    });
+
+    // Meta Pixel: Track Purchase with order ID and value
+    trackPurchase({
+      id: order.id,
+      total: order.total,
+      itemsCount: order.items.reduce((sum, item) => sum + item.quantity, 0),
     });
 
     clearCartProducts();
