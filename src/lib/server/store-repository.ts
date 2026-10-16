@@ -643,7 +643,7 @@ function normalizeOrderRecord(
   };
 }
 
-const MEMORY_CACHE_TTL_MS = 3_000;
+const MEMORY_CACHE_TTL_MS = 120_000;
 
 let cachedLocalStore: { data: LocalRuntimeStore; expiresAt: number } | null = null;
 let cachedSettings: { data: AdminSettingsRecord; expiresAt: number } | null = null;
@@ -966,6 +966,7 @@ async function fetchRawProductsFromSource(): Promise<AdminProductRecord[]> {
       const response = await fetch(endpoint, {
         headers: supabaseHeaders(true),
         cache: "no-store",
+        signal: AbortSignal.timeout(3000),
       });
 
       if (response.ok) {
@@ -1001,8 +1002,24 @@ export async function getAllStoreProducts(options?: {
       data: products,
       expiresAt: Date.now() + MEMORY_CACHE_TTL_MS,
     };
-  } else if (cachedRawProducts && Date.now() < cachedRawProducts.expiresAt) {
+  } else if (cachedRawProducts) {
     products = cachedRawProducts.data;
+    // SWR: Return cached in 0ms, refresh in background if expired
+    if (Date.now() >= cachedRawProducts.expiresAt && !inFlightProductsPromise) {
+      inFlightProductsPromise = fetchRawProductsFromSource()
+        .then((res) => {
+          cachedRawProducts = {
+            data: res,
+            expiresAt: Date.now() + MEMORY_CACHE_TTL_MS,
+          };
+          inFlightProductsPromise = null;
+          return res;
+        })
+        .catch(() => {
+          inFlightProductsPromise = null;
+          return cachedRawProducts?.data ?? [];
+        });
+    }
   } else {
     if (!inFlightProductsPromise) {
       inFlightProductsPromise = fetchRawProductsFromSource()
@@ -2513,6 +2530,7 @@ async function fetchStoreSettingsFromSource(): Promise<AdminSettingsRecord> {
         {
           headers: supabaseHeaders(true),
           cache: "no-store",
+          signal: AbortSignal.timeout(3000),
         },
       );
       if (res.ok) {
@@ -2609,9 +2627,27 @@ async function fetchStoreSettingsFromSource(): Promise<AdminSettingsRecord> {
 }
 
 export async function getStoreSettings(): Promise<AdminSettingsRecord> {
-  if (cachedSettings && Date.now() < cachedSettings.expiresAt) {
-    return cachedSettings.data;
+  if (cachedSettings) {
+    const data = cachedSettings.data;
+    // SWR: Return cached in 0ms, refresh in background if expired
+    if (Date.now() >= cachedSettings.expiresAt && !inFlightSettingsPromise) {
+      inFlightSettingsPromise = fetchStoreSettingsFromSource()
+        .then((res) => {
+          cachedSettings = {
+            data: res,
+            expiresAt: Date.now() + MEMORY_CACHE_TTL_MS,
+          };
+          inFlightSettingsPromise = null;
+          return res;
+        })
+        .catch(() => {
+          inFlightSettingsPromise = null;
+          return cachedSettings?.data ?? DEFAULT_SETTINGS;
+        });
+    }
+    return data;
   }
+
   if (!inFlightSettingsPromise) {
     inFlightSettingsPromise = fetchStoreSettingsFromSource()
       .then((res) => {
@@ -2857,8 +2893,8 @@ async function fetchReviewsFromSource(options?: {
       const res = await fetch(
         endpoint,
         isPublicApprovedRead
-          ? { headers: supabaseHeaders(true), next: { revalidate: 60 } }
-          : { headers: supabaseHeaders(true), cache: "no-store" },
+          ? { headers: supabaseHeaders(true), next: { revalidate: 60 }, signal: AbortSignal.timeout(3000) }
+          : { headers: supabaseHeaders(true), cache: "no-store", signal: AbortSignal.timeout(3000) },
       );
       if (res.ok) {
         const rows = (await res.json()) as Array<{
@@ -2899,6 +2935,7 @@ async function fetchReviewsFromSource(options?: {
           {
             headers: supabaseHeaders(true),
             cache: "no-store",
+            signal: AbortSignal.timeout(3000),
           },
         );
         if (sysRes.ok) {
@@ -2950,26 +2987,51 @@ export async function getAllStoreReviews(options?: {
   productId?: string;
   status?: "all" | "approved" | "pending" | "rejected";
 }): Promise<AdminReviewRecord[]> {
-  if (options?.status === "approved" && !options?.productId) {
-    if (cachedApprovedReviews && Date.now() < cachedApprovedReviews.expiresAt) {
-      return cachedApprovedReviews.data;
+  const isApproved = !options?.status || options.status === "approved";
+
+  if (isApproved) {
+    let list: AdminReviewRecord[];
+    if (cachedApprovedReviews) {
+      list = cachedApprovedReviews.data;
+      // SWR: Return cached reviews in 0ms, refresh in background if expired
+      if (Date.now() >= cachedApprovedReviews.expiresAt && !inFlightApprovedReviewsPromise) {
+        inFlightApprovedReviewsPromise = fetchReviewsFromSource({ status: "approved" })
+          .then((res) => {
+            cachedApprovedReviews = {
+              data: res,
+              expiresAt: Date.now() + MEMORY_CACHE_TTL_MS,
+            };
+            inFlightApprovedReviewsPromise = null;
+            return res;
+          })
+          .catch(() => {
+            inFlightApprovedReviewsPromise = null;
+            return cachedApprovedReviews?.data ?? [];
+          });
+      }
+    } else {
+      if (!inFlightApprovedReviewsPromise) {
+        inFlightApprovedReviewsPromise = fetchReviewsFromSource({ status: "approved" })
+          .then((res) => {
+            cachedApprovedReviews = {
+              data: res,
+              expiresAt: Date.now() + MEMORY_CACHE_TTL_MS,
+            };
+            inFlightApprovedReviewsPromise = null;
+            return res;
+          })
+          .catch((err) => {
+            inFlightApprovedReviewsPromise = null;
+            throw err;
+          });
+      }
+      list = await inFlightApprovedReviewsPromise;
     }
-    if (!inFlightApprovedReviewsPromise) {
-      inFlightApprovedReviewsPromise = fetchReviewsFromSource({ status: "approved" })
-        .then((res) => {
-          cachedApprovedReviews = {
-            data: res,
-            expiresAt: Date.now() + MEMORY_CACHE_TTL_MS,
-          };
-          inFlightApprovedReviewsPromise = null;
-          return res;
-        })
-        .catch((err) => {
-          inFlightApprovedReviewsPromise = null;
-          throw err;
-        });
+
+    if (options?.productId) {
+      return list.filter((r) => r.productId === options.productId);
     }
-    return inFlightApprovedReviewsPromise;
+    return list;
   }
 
   return fetchReviewsFromSource(options);

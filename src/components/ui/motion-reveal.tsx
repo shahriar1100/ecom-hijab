@@ -150,8 +150,15 @@ export function StorefrontMotion() {
       row.scrollTop = 0;
     });
 
-    // Prepare initial hidden state so items stay hidden until scrolled into view
+    // Ensure in-viewport elements render instantly without blank delay or layout flicker
     for (const el of targets) {
+      const rect = el.getBoundingClientRect();
+      if (rect.top < window.innerHeight && rect.bottom > 0) {
+        animatedSet.add(el);
+        el.style.opacity = "1";
+        el.style.transform = "none";
+        continue;
+      }
       const kind = getRevealKind(el);
       el.style.opacity = "0";
       el.style.transform = getInitialTransform(kind);
