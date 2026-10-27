@@ -10,6 +10,9 @@ const nextConfig: NextConfig = {
     ],
   },
   devIndicators: false,
+  experimental: {
+    agentUpgrade: "security",
+  } as unknown as NextConfig["experimental"],
 };
 
 export default nextConfig;
