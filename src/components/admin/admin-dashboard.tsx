@@ -44,6 +44,7 @@ import {
   Truck,
   Users,
   X,
+  Printer,
 } from "lucide-react";
 import { photos } from "@/data/photos";
 import {
@@ -55,6 +56,7 @@ import { formatPrice, stories as defaultStories } from "@/data/store";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { ProductCard } from "@/components/product/product-card";
 import { ProductPhoto } from "@/components/product/product-photo";
+import { printOrderInvoice } from "@/lib/invoice-printer";
 import {
   CategoryPerformanceChart,
   CustomerAnalyticsChart,
@@ -84,7 +86,15 @@ import type {
   ProductSectionKey,
   ProductStatus,
 } from "@/lib/server/store-repository";
-import type { Fabric, Photo, ProductCategory, ProductColour, Story } from "@/types/store";
+import type {
+  Fabric,
+  Photo,
+  ProductCategory,
+  ProductColour,
+  Story,
+  CourierProvider,
+  FraudCheckResult,
+} from "@/types/store";
 
 type PublicCustomerAccount = Omit<CustomerAccountRecord, "password">;
 
@@ -653,6 +663,32 @@ export function AdminDashboard({
   );
   const [savingSettings, setSavingSettings] = useState(false);
 
+  // Courier & Fraud Check Configuration State
+  const [courierProvider, setCourierProvider] = useState<CourierProvider>(
+    analytics.settings.courier?.provider ?? "steadfast",
+  );
+  const [courierEnabled, setCourierEnabled] = useState(
+    analytics.settings.courier?.enabled ?? false,
+  );
+  const [steadfastApiKey, setSteadfastApiKey] = useState(
+    analytics.settings.courier?.steadfastApiKey ?? "",
+  );
+  const [steadfastSecretKey, setSteadfastSecretKey] = useState(
+    analytics.settings.courier?.steadfastSecretKey ?? "",
+  );
+  const [autoFraudCheck, setAutoFraudCheck] = useState(
+    analytics.settings.courier?.autoFraudCheck ?? true,
+  );
+  const [courierTestMode, setCourierTestMode] = useState(
+    analytics.settings.courier?.testMode ?? false,
+  );
+
+  // Live Fraud Check & Courier Dispatch State
+  const [fraudCheckingPhone, setFraudCheckingPhone] = useState<string | null>(null);
+  const [fraudResults, setFraudResults] = useState<{ [phone: string]: FraudCheckResult }>({});
+  const [dispatchingOrderId, setDispatchingOrderId] = useState<string | null>(null);
+  const [courierFeedback, setCourierFeedback] = useState<{ [orderId: string]: string }>({});
+
   // Facebook / Meta Pixel Configuration State
   const [fbPixelId, setFbPixelId] = useState(
     analytics.settings.facebookPixel?.pixelId ?? "",
@@ -823,6 +859,14 @@ export function AdminDashboard({
             setFbPixelTestMode(s.facebookPixel.testMode ?? false);
             setFbPixelVerifiedAt(s.facebookPixel.lastVerifiedAt ?? null);
           }
+          if (s.courier) {
+            setCourierProvider(s.courier.provider ?? "steadfast");
+            setCourierEnabled(s.courier.enabled ?? false);
+            setSteadfastApiKey(s.courier.steadfastApiKey ?? "");
+            setSteadfastSecretKey(s.courier.steadfastSecretKey ?? "");
+            setAutoFraudCheck(s.courier.autoFraudCheck ?? true);
+            setCourierTestMode(s.courier.testMode ?? false);
+          }
           if (s.heroSlides || s.heroBanner) {
             setHeroSlides(buildHeroSlidesState(s.heroSlides, s.heroBanner));
           }
@@ -876,130 +920,59 @@ export function AdminDashboard({
     [authenticated, datePreset, customStart, customEnd],
   );
 
-  function printOrderInvoice(order: AdminOrderRecord) {
-    if (typeof window === "undefined") return;
-    const printWin = window.open("", "_blank", "width=820,height=900");
-    if (!printWin) return;
+  function handlePrintInvoice(order: AdminOrderRecord) {
+    printOrderInvoice(order, {
+      storeName: analytics.settings.storeName,
+      contactEmail: analytics.settings.contactEmail,
+      contactPhone: analytics.settings.contactPhone,
+      contactLocation: analytics.settings.contactLocation,
+    });
+  }
 
-    const rowsHtml = order.items
-      .map(
-        (item, idx) => `
-        <tr>
-          <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;">${idx + 1}</td>
-          <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;font-weight:600;">${item.name}</td>
-          <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:center;">${item.quantity}</td>
-          <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;">৳${item.price.toLocaleString("en-IN")}</td>
-          <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;">৳${(item.price * item.quantity).toLocaleString("en-IN")}</td>
-        </tr>`,
-      )
-      .join("");
-
-    const storeTitle = analytics.settings.storeName || "NOOR Hijab & Modest Wear";
-    const zoneLabel = order.deliveryZone === "inside-dhaka" ? "Inside Dhaka" : "Outside Dhaka";
-
-    const html = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <title>Invoice ${order.id} — ${storeTitle}</title>
-  <style>
-    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #111827; margin: 0; padding: 32px; background: #fff; }
-    .inv-box { max-width: 740px; margin: 0 auto; border: 1px solid #d1d5db; border-radius: 12px; padding: 28px; }
-    .inv-head { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #111827; padding-bottom: 18px; margin-bottom: 20px; }
-    .inv-brand h1 { margin: 0; font-size: 24px; letter-spacing: 0.08em; }
-    .inv-brand p { margin: 4px 0 0; font-size: 12px; color: #4b5563; }
-    .inv-meta { text-align: right; font-size: 13px; line-height: 1.6; }
-    .inv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 22px; }
-    .inv-card { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px 16px; font-size: 13px; line-height: 1.6; }
-    .inv-card h3 { margin: 0 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #6b7280; }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 20px; }
-    th { background: #111827; color: #fff; text-align: left; padding: 10px 12px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
-    .inv-totals { width: 280px; margin-left: auto; font-size: 13px; }
-    .inv-totals div { display: flex; justify-content: space-between; padding: 5px 0; }
-    .inv-totals .grand { border-top: 2px solid #111827; margin-top: 6px; padding-top: 10px; font-size: 16px; font-weight: 700; }
-    .inv-foot { margin-top: 32px; padding-top: 16px; border-top: 1px dashed #d1d5db; display: flex; justify-content: space-between; font-size: 12px; color: #6b7280; }
-    @media print { body { padding: 0; } .inv-box { border: none; } }
-  </style>
-</head>
-<body>
-  <div class="inv-box">
-    <div class="inv-head">
-      <div class="inv-brand">
-        <h1>NOOR</h1>
-        <p>${storeTitle}</p>
-        <p>Dhaka, Bangladesh · Official Order Invoice &amp; Courier Label</p>
-      </div>
-      <div class="inv-meta">
-        <div><strong>INVOICE:</strong> ${order.id}</div>
-        <div><strong>Date:</strong> ${formatOrderDate(order.createdAt, true)}</div>
-        <div><strong>Order Status:</strong> ${order.status}</div>
-        <div><strong>Payment:</strong> ${order.paymentMethod.toUpperCase()} (${order.paymentStatus})</div>
-      </div>
-    </div>
-
-    <div class="inv-grid">
-      <div class="inv-card">
-        <h3>Ship To (Recipient)</h3>
-        <div><strong>${order.customer.name}</strong></div>
-        <div>Phone: <strong>${order.customer.phone}</strong></div>
-        ${order.customer.email ? `<div>Email: ${order.customer.email}</div>` : ""}
-        <div>Address: ${order.customer.address}, ${order.customer.city}</div>
-        <div>Zone: ${zoneLabel}</div>
-        ${order.customer.notes ? `<div>Note: ${order.customer.notes}</div>` : ""}
-      </div>
-      <div class="inv-card">
-        <h3>Courier &amp; COD Collection</h3>
-        <div><strong>Collectable Amount:</strong> ${
-          order.paymentStatus === "Paid"
-            ? "৳0 (PAID)"
-            : `৳${order.total.toLocaleString("en-IN")} (${order.paymentMethod.toUpperCase()})`
-        }</div>
-        <div><strong>Delivery Status:</strong> ${order.deliveryStatus}</div>
-        ${order.couponCode ? `<div><strong>Coupon Used:</strong> ${order.couponCode}</div>` : ""}
-        ${order.paymentPhone ? `<div><strong>Sender/TrxID:</strong> ${order.paymentPhone}</div>` : ""}
-      </div>
-    </div>
-
-    <table>
-      <thead>
-        <tr>
-          <th style="width:40px;">#</th>
-          <th>Product Description</th>
-          <th style="text-align:center;width:70px;">Qty</th>
-          <th style="text-align:right;width:110px;">Unit Price</th>
-          <th style="text-align:right;width:120px;">Line Total</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${rowsHtml}
-      </tbody>
-    </table>
-
-    <div class="inv-totals">
-      <div><span>Subtotal</span><span>৳${order.subtotal.toLocaleString("en-IN")}</span></div>
-      ${
-        order.discountAmount > 0
-          ? `<div><span>Discount ${order.couponCode ? `(${order.couponCode})` : ""}</span><span>-৳${order.discountAmount.toLocaleString("en-IN")}</span></div>`
-          : ""
+  async function handleDispatchCourier(order: AdminOrderRecord) {
+    setDispatchingOrderId(order.id);
+    try {
+      const res = await fetch("/api/admin/courier/dispatch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: order.id }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setCourierFeedback((prev) => ({
+          ...prev,
+          [order.id]: `Dispatched to Steadfast! Tracking: ${data.trackingCode || data.consignmentId}`,
+        }));
+        setFeedback(`Order ${order.id} sent to Steadfast Courier! Tracking: ${data.trackingCode || ""}`);
+        await fetchAnalyticsData();
+      } else {
+        const errMsg = data.error || data.message || "Failed to dispatch parcel.";
+        setCourierFeedback((prev) => ({ ...prev, [order.id]: errMsg }));
+        setFeedback(errMsg);
       }
-      <div><span>Delivery Fee (${zoneLabel})</span><span>৳${order.shippingFee.toLocaleString("en-IN")}</span></div>
-      <div class="grand"><span>Total Payable</span><span>৳${order.total.toLocaleString("en-IN")}</span></div>
-    </div>
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Error dispatching to courier.";
+      setCourierFeedback((prev) => ({ ...prev, [order.id]: msg }));
+      setFeedback(msg);
+    } finally {
+      setDispatchingOrderId(null);
+    }
+  }
 
-    <div class="inv-foot">
-      <span>Thank you for shopping with ${storeTitle}!</span>
-      <span>Customer / Courier Signature: ______________________</span>
-    </div>
-  </div>
-  <script>
-    window.onload = function () { window.print(); };
-  </script>
-</body>
-</html>`;
-
-    printWin.document.open();
-    printWin.document.write(html);
-    printWin.document.close();
+  async function handleCheckFraud(phone: string) {
+    if (!phone) return;
+    setFraudCheckingPhone(phone);
+    try {
+      const res = await fetch(`/api/admin/courier/fraud-check?phone=${encodeURIComponent(phone)}`);
+      const data = await res.json();
+      if (res.ok && data.result) {
+        setFraudResults((prev) => ({ ...prev, [phone]: data.result }));
+      }
+    } catch (err) {
+      console.error("Fraud check failed:", err);
+    } finally {
+      setFraudCheckingPhone(null);
+    }
   }
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
@@ -1593,12 +1566,50 @@ export function AdminDashboard({
             testMode: fbPixelTestMode,
             lastVerifiedAt: fbPixelVerifiedAt,
           },
+          courier: {
+            provider: courierProvider,
+            enabled: Boolean(steadfastApiKey.trim() && steadfastSecretKey.trim()),
+            steadfastApiKey: steadfastApiKey.trim(),
+            steadfastSecretKey: steadfastSecretKey.trim(),
+            autoFraudCheck,
+            testMode: courierTestMode,
+          },
         }),
       });
       if (res.ok) {
         await fetchAnalyticsData();
-        setFeedback("Store settings & Meta Pixel configuration saved!");
+        setFeedback("Store settings, Courier & Meta Pixel configuration saved!");
       }
+    } finally {
+      setSavingSettings(false);
+    }
+  }
+
+  async function handleSaveCourierSettings() {
+    setSavingSettings(true);
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          courier: {
+            provider: courierProvider,
+            enabled: Boolean(steadfastApiKey.trim() && steadfastSecretKey.trim()),
+            steadfastApiKey: steadfastApiKey.trim(),
+            steadfastSecretKey: steadfastSecretKey.trim(),
+            autoFraudCheck,
+            testMode: courierTestMode,
+          },
+        }),
+      });
+      if (res.ok) {
+        await fetchAnalyticsData();
+        setFeedback("Courier & Fraud Check integration settings saved successfully!");
+      } else {
+        setFeedback("Failed to save courier settings.");
+      }
+    } catch {
+      setFeedback("Failed to save courier settings.");
     } finally {
       setSavingSettings(false);
     }
@@ -4234,6 +4245,40 @@ export function AdminDashboard({
                                 <span>
                                   {order.customer.phone} · {order.customer.city}
                                 </span>
+                                <div style={{ marginTop: 2, display: "flex", gap: 6, alignItems: "center" }}>
+                                  {(() => {
+                                    const fraud = fraudResults[order.customer.phone];
+                                    if (fraud) {
+                                      const badgeClass =
+                                        fraud.riskLevel === "safe"
+                                          ? "is-success"
+                                          : fraud.riskLevel === "moderate"
+                                            ? "is-warning"
+                                            : "is-danger";
+                                      return (
+                                        <span
+                                          className={`adm-status-pill ${badgeClass}`}
+                                          style={{ fontSize: 10, padding: "1px 6px" }}
+                                          title={`Delivery Rate: ${fraud.successRate}%, Total Orders: ${fraud.totalOrders}, Returns: ${fraud.totalCancelled}`}
+                                        >
+                                          {fraud.riskLevel === "safe" ? "🟢 Safe" : fraud.riskLevel === "moderate" ? "🟡 Moderate" : "🔴 High Risk"} ({fraud.successRate}%)
+                                        </span>
+                                      );
+                                    }
+                                    return (
+                                      <button
+                                        type="button"
+                                        className="adm-btn adm-btn-xs adm-btn-secondary"
+                                        style={{ fontSize: 10, padding: "1px 6px", height: "auto" }}
+                                        onClick={() => void handleCheckFraud(order.customer.phone)}
+                                        disabled={fraudCheckingPhone === order.customer.phone}
+                                        title="Check delivery fraud & Steadfast courier history"
+                                      >
+                                        {fraudCheckingPhone === order.customer.phone ? "Checking…" : "🛡️ Fraud Check"}
+                                      </button>
+                                    );
+                                  })()}
+                                </div>
                               </div>
                             </td>
                             <td>
@@ -4303,6 +4348,13 @@ export function AdminDashboard({
                                   </option>
                                 ))}
                               </select>
+                              {order.courierTrackingCode && (
+                                <div style={{ fontSize: 11, marginTop: 4 }}>
+                                  <span className="adm-status-pill is-info" style={{ fontSize: 10, padding: "1px 6px" }}>
+                                    🚚 {order.courierTrackingCode}
+                                  </span>
+                                </div>
+                              )}
                             </td>
                             <td>
                               <div className="adm-row-actions">
@@ -4316,11 +4368,22 @@ export function AdminDashboard({
                                 <button
                                   type="button"
                                   className="adm-btn adm-btn-sm adm-btn-secondary"
-                                  onClick={() => printOrderInvoice(order)}
-                                  title="Print Order Invoice & Shipping Label"
+                                  onClick={() => handlePrintInvoice(order)}
+                                  title="Print Order Invoice & Packing Slip"
                                 >
-                                  <Download size={13} /> Invoice
+                                  <Printer size={13} /> Invoice
                                 </button>
+                                {!order.courierTrackingCode && order.status !== "Cancelled" && (
+                                  <button
+                                    type="button"
+                                    className="adm-btn adm-btn-sm adm-btn-primary"
+                                    onClick={() => void handleDispatchCourier(order)}
+                                    disabled={dispatchingOrderId === order.id}
+                                    title="Send parcel to Steadfast Courier API"
+                                  >
+                                    <Truck size={13} /> {dispatchingOrderId === order.id ? "…" : "Steadfast"}
+                                  </button>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -6557,6 +6620,122 @@ export function AdminDashboard({
                   })}
                 </div>
               </div>
+
+              <div className="adm-panel" style={{ gridColumn: "1 / -1" }}>
+                <div className="adm-panel-head">
+                  <div>
+                    <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <Truck size={18} /> Courier Automation &amp; Phone Fraud Check
+                    </h3>
+                    <p className="adm-panel-sub">
+                      Connect your Steadfast Courier API credentials for 1-click parcel generation, auto tracking codes, and fake-order fraud prevention
+                    </p>
+                  </div>
+                  <div>
+                    {courierEnabled && steadfastApiKey.trim() ? (
+                      <span className="adm-status-pill is-success">🟢 Steadfast API Connected</span>
+                    ) : (
+                      <span className="adm-status-pill is-warning">🟡 Ready for Client API Keys</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="adm-form-stack" style={{ marginTop: 14 }}>
+                  <div className="adm-grid-2" style={{ gap: 16 }}>
+                    <div className="adm-field">
+                      <label htmlFor="courier-prov">Active Courier Provider</label>
+                      <select
+                        id="courier-prov"
+                        className="adm-select"
+                        value={courierProvider}
+                        onChange={(e) => setCourierProvider(e.target.value as CourierProvider)}
+                      >
+                        <option value="steadfast">Steadfast Courier (API Automation &amp; Tracking)</option>
+                        <option value="manual">Manual / Own Delivery Fleet</option>
+                      </select>
+                    </div>
+
+                    <div className="adm-field">
+                      <label htmlFor="courier-mode">Environment &amp; Protection</label>
+                      <div style={{ display: "flex", gap: 16, alignItems: "center", height: 42 }}>
+                        <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 13 }}>
+                          <input
+                            type="checkbox"
+                            checked={courierTestMode}
+                            onChange={(e) => setCourierTestMode(e.target.checked)}
+                          />
+                          Sandbox / Test Mode
+                        </label>
+                        <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 13 }}>
+                          <input
+                            type="checkbox"
+                            checked={autoFraudCheck}
+                            onChange={(e) => setAutoFraudCheck(e.target.checked)}
+                          />
+                          Auto Fraud Checking
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="adm-form-row-2">
+                    <div className="adm-field">
+                      <label htmlFor="set-sf-key">Steadfast API Key</label>
+                      <input
+                        id="set-sf-key"
+                        type="text"
+                        className="adm-input"
+                        placeholder="e.g. stf_live_xxxx... (provided by client)"
+                        value={steadfastApiKey}
+                        onChange={(e) => {
+                          setSteadfastApiKey(e.target.value);
+                          if (e.target.value.trim()) setCourierEnabled(true);
+                        }}
+                      />
+                    </div>
+                    <div className="adm-field">
+                      <label htmlFor="set-sf-sec">Steadfast Secret Key</label>
+                      <input
+                        id="set-sf-sec"
+                        type="password"
+                        className="adm-input"
+                        placeholder="Steadfast Secret Key"
+                        value={steadfastSecretKey}
+                        onChange={(e) => setSteadfastSecretKey(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      background: "var(--surface)",
+                      border: "1px dashed var(--line)",
+                      borderRadius: 10,
+                      padding: 14,
+                      fontSize: 13,
+                      color: "var(--muted)",
+                      lineHeight: 1.6,
+                    }}
+                  >
+                    <strong>💡 Client Courier Integration Note:</strong>
+                    <div>
+                      When your client provides their Steadfast Courier API Key &amp; Secret Key from their Steadfast Merchant Portal, simply paste them here and save.
+                      The system will immediately enable 1-click parcel booking from the <strong>Orders</strong> tab, assign consignment IDs, and query Steadfast delivery history to catch serial returners and fake orders before dispatch.
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
+                    <button
+                      type="button"
+                      className="adm-btn adm-btn-primary"
+                      onClick={() => void handleSaveCourierSettings()}
+                      disabled={savingSettings}
+                    >
+                      {savingSettings ? "Saving…" : "Save Courier & Fraud Check Settings"}
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -6849,6 +7028,27 @@ export function AdminDashboard({
                       }`}
                     >
                       {status.cloudinaryConfigured ? "Live CDN" : "Local Upload"}
+                    </span>
+                  </div>
+
+                  <div className="adm-mini-stat-row">
+                    <div>
+                      <strong>
+                        <Truck size={14} style={{ display: "inline", marginRight: 6 }} />
+                        Steadfast Courier API &amp; Fraud Shield
+                      </strong>
+                      <span style={{ display: "block", fontSize: 11, color: "var(--muted)" }}>
+                        {courierEnabled && steadfastApiKey.trim()
+                          ? "Connected (1-click parcel booking & phone fraud check active)"
+                          : "Ready for client keys (configure under Shipping or Settings)"}
+                      </span>
+                    </div>
+                    <span
+                      className={`adm-status-pill ${
+                        courierEnabled && steadfastApiKey.trim() ? "is-success" : "is-warning"
+                      }`}
+                    >
+                      {courierEnabled && steadfastApiKey.trim() ? "API Active" : "Manual Mode"}
                     </span>
                   </div>
                 </div>
@@ -7777,9 +7977,9 @@ export function AdminDashboard({
                 <button
                   type="button"
                   className="adm-btn adm-btn-sm adm-btn-secondary"
-                  onClick={() => printOrderInvoice(selectedOrder)}
+                  onClick={() => handlePrintInvoice(selectedOrder)}
                 >
-                  <Download size={14} /> Print Invoice
+                  <Printer size={14} /> Print Invoice
                 </button>
                 <button
                   type="button"
@@ -7832,6 +8032,146 @@ export function AdminDashboard({
                       <strong>{formatPrice(item.price * item.quantity)}</strong>
                     </div>
                   ))}
+                </div>
+              </div>
+
+              {/* Courier Logistics & Fraud Check Block */}
+              <div
+                className="adm-info-block"
+                style={{
+                  borderLeft: "4px solid var(--accent)",
+                  background: "var(--surface)",
+                  borderRadius: 12,
+                  padding: 16,
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: 12,
+                    flexWrap: "wrap",
+                    gap: 10,
+                  }}
+                >
+                  <div>
+                    <h4 style={{ margin: 0, display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
+                      <Truck size={16} /> Courier Dispatch &amp; Fraud Prevention
+                    </h4>
+                    <span style={{ fontSize: 12, color: "var(--muted)" }}>
+                      Steadfast parcel booking &amp; delivery risk assessment
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button
+                      type="button"
+                      className="adm-btn adm-btn-sm adm-btn-secondary"
+                      onClick={() => void handleCheckFraud(selectedOrder.customer.phone)}
+                      disabled={fraudCheckingPhone === selectedOrder.customer.phone}
+                    >
+                      <ShieldCheck size={14} />{" "}
+                      {fraudCheckingPhone === selectedOrder.customer.phone ? "Checking…" : "Run Fraud Check"}
+                    </button>
+                    {!selectedOrder.courierTrackingCode && selectedOrder.status !== "Cancelled" && (
+                      <button
+                        type="button"
+                        className="adm-btn adm-btn-sm adm-btn-primary"
+                        onClick={() => void handleDispatchCourier(selectedOrder)}
+                        disabled={dispatchingOrderId === selectedOrder.id}
+                      >
+                        <Truck size={14} />{" "}
+                        {dispatchingOrderId === selectedOrder.id ? "Dispatching…" : "Dispatch to Steadfast"}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="adm-grid-2" style={{ gap: 12 }}>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      background: "var(--bg)",
+                      padding: 12,
+                      borderRadius: 8,
+                      border: "1px solid var(--line)",
+                    }}
+                  >
+                    <strong>Courier Parcel Status:</strong>
+                    <div style={{ marginTop: 6, lineHeight: 1.6 }}>
+                      {selectedOrder.courierTrackingCode ? (
+                        <div>
+                          <span className="adm-status-pill is-success" style={{ marginBottom: 6, display: "inline-block" }}>
+                            Dispatched via Steadfast
+                          </span>
+                          <div>Tracking Code: <strong>{selectedOrder.courierTrackingCode}</strong></div>
+                          {selectedOrder.courierConsignmentId && (
+                            <div>Consignment ID: <strong>{selectedOrder.courierConsignmentId}</strong></div>
+                          )}
+                        </div>
+                      ) : (
+                        <span style={{ color: "var(--muted)" }}>
+                          Not yet booked with courier. Click &quot;Dispatch to Steadfast&quot; when ready to ship.
+                        </span>
+                      )}
+                      {courierFeedback[selectedOrder.id] && (
+                        <div style={{ marginTop: 6, fontSize: 12, color: "var(--accent)" }}>
+                          ℹ️ {courierFeedback[selectedOrder.id]}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      fontSize: 13,
+                      background: "var(--bg)",
+                      padding: 12,
+                      borderRadius: 8,
+                      border: "1px solid var(--line)",
+                    }}
+                  >
+                    <strong>Fraud &amp; Return Analysis:</strong>
+                    <div style={{ marginTop: 6 }}>
+                      {(() => {
+                        const fraud = fraudResults[selectedOrder.customer.phone];
+                        if (!fraud) {
+                          return (
+                            <span style={{ color: "var(--muted)" }}>
+                              Click &quot;Run Fraud Check&quot; to inspect this phone number across our store database and live courier delivery logs.
+                            </span>
+                          );
+                        }
+                        const riskColor =
+                          fraud.riskLevel === "safe"
+                            ? "#16a34a"
+                            : fraud.riskLevel === "moderate"
+                              ? "#d97706"
+                              : "#dc2626";
+                        return (
+                          <div style={{ lineHeight: 1.6 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                              <span>Risk Level:</span>
+                              <strong style={{ color: riskColor, textTransform: "uppercase" }}>
+                                {fraud.riskLevel} ({fraud.successRate}% delivery rate)
+                              </strong>
+                            </div>
+                            <div>
+                              This Store: <strong>{fraud.storeOrdersCount}</strong> orders ({fraud.storeDeliveredCount} delivered, {fraud.storeCancelledCount} cancelled)
+                            </div>
+                            <div>
+                              Courier Parcels: <strong>{fraud.courierTotalOrders}</strong> nationwide ({fraud.courierSuccessOrders} delivered, {fraud.courierCancelledOrders} returned)
+                            </div>
+                            {fraud.notes && (
+                              <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>
+                                Note: {fraud.notes}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
                 </div>
               </div>
 

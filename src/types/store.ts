@@ -71,3 +71,39 @@ export type FacebookPixelConfig = {
   testMode?: boolean;
   lastVerifiedAt?: string | null;
 };
+
+export type CourierProvider = "steadfast" | "pathao";
+
+export type CourierConfig = {
+  provider: CourierProvider;
+  enabled: boolean;
+  steadfastApiKey?: string;
+  steadfastSecretKey?: string;
+  pathaoClientId?: string;
+  pathaoClientSecret?: string;
+  pathaoUsername?: string;
+  pathaoPassword?: string;
+  pathaoStoreId?: string;
+  autoFraudCheck: boolean;
+  testMode?: boolean;
+};
+
+export type FraudCheckResult = {
+  phone: string;
+  riskLevel: "safe" | "moderate" | "high" | "unknown";
+  successRate?: number; // e.g. 92%
+  totalParcels?: number;
+  deliveredParcels?: number;
+  cancelledParcels?: number;
+  returnedParcels?: number;
+  totalOrders?: number;
+  totalCancelled?: number;
+  storeOrdersCount?: number;
+  storeDeliveredCount?: number;
+  storeCancelledCount?: number;
+  courierTotalOrders?: number;
+  courierSuccessOrders?: number;
+  courierCancelledOrders?: number;
+  notes?: string;
+  source: "steadfast" | "pathao" | "internal" | "combined";
+};

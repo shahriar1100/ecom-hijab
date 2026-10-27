@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { Order } from "@/lib/orders";
 import { getStoreOrdersByCustomer, recordCustomerOrder } from "@/lib/server/store-repository";
+import { sendOrderConfirmationEmail, sendAdminNewOrderNotification } from "@/lib/server/email";
 
 export async function GET(request: Request) {
   try {
@@ -33,6 +34,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid order payload." }, { status: 400 });
     }
     const result = await recordCustomerOrder(order);
+
+    // Trigger confirmation email in the background without blocking the checkout response
+    if (order.customer?.email && order.customer.email.includes("@")) {
+      void sendOrderConfirmationEmail({ order, to: order.customer.email }).catch(() => {});
+    }
+    void sendAdminNewOrderNotification({ order }).catch(() => {});
+
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to record order.";

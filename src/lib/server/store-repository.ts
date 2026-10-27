@@ -19,6 +19,7 @@ import type {
   ProductVariant,
   Story,
   FacebookPixelConfig,
+  CourierConfig,
 } from "@/types/store";
 import {
   deleteUploadedMedia,
@@ -164,6 +165,7 @@ export type AdminSettingsRecord = {
   taxonomy: CatalogTaxonomy;
   stories: Story[];
   facebookPixel?: FacebookPixelConfig;
+  courier?: CourierConfig;
 };
 
 export type AdminActivityRecord = {
@@ -340,6 +342,22 @@ export function normalizeFacebookPixel(raw?: Partial<FacebookPixelConfig> | null
   };
 }
 
+export function normalizeCourier(raw?: Partial<CourierConfig> | null): CourierConfig {
+  return {
+    provider: raw?.provider === "pathao" ? "pathao" : "steadfast",
+    enabled: Boolean(raw?.enabled),
+    steadfastApiKey: raw?.steadfastApiKey?.trim() || "",
+    steadfastSecretKey: raw?.steadfastSecretKey?.trim() || "",
+    pathaoClientId: raw?.pathaoClientId?.trim() || "",
+    pathaoClientSecret: raw?.pathaoClientSecret?.trim() || "",
+    pathaoUsername: raw?.pathaoUsername?.trim() || "",
+    pathaoPassword: raw?.pathaoPassword?.trim() || "",
+    pathaoStoreId: raw?.pathaoStoreId?.trim() || "",
+    autoFraudCheck: raw?.autoFraudCheck !== false,
+    testMode: raw?.testMode !== false,
+  };
+}
+
 const DEFAULT_SETTINGS: AdminSettingsRecord = {
   storeName: "NOOR Hijab & Modest Wear",
   timezone: "Asia/Dhaka",
@@ -367,6 +385,19 @@ const DEFAULT_SETTINGS: AdminSettingsRecord = {
     enabled: false,
     testMode: false,
     lastVerifiedAt: null,
+  },
+  courier: {
+    provider: "steadfast",
+    enabled: false,
+    steadfastApiKey: "",
+    steadfastSecretKey: "",
+    pathaoClientId: "",
+    pathaoClientSecret: "",
+    pathaoUsername: "",
+    pathaoPassword: "",
+    pathaoStoreId: "",
+    autoFraudCheck: true,
+    testMode: true,
   },
 };
 
@@ -2112,6 +2143,9 @@ export async function updateStoreOrder(input: {
   paymentStatus?: AdminPaymentStatus;
   deliveryStatus?: AdminDeliveryStatus;
   refundAmount?: number;
+  courierProvider?: "steadfast" | "pathao" | "manual";
+  courierTrackingCode?: string;
+  courierConsignmentId?: string;
 }): Promise<{ storage: "supabase" | "local"; order: AdminOrderRecord | null }> {
   const local = await readLocalStore();
   const target = local.orders.find((order) => order.id === input.id);
@@ -2195,6 +2229,9 @@ export async function updateStoreOrder(input: {
     target.paymentStatus = nextPaymentStatus;
     target.deliveryStatus = nextDeliveryStatus;
     target.refundAmount = nextRefund;
+    if (input.courierProvider) target.courierProvider = input.courierProvider;
+    if (input.courierTrackingCode) target.courierTrackingCode = input.courierTrackingCode;
+    if (input.courierConsignmentId) target.courierConsignmentId = input.courierConsignmentId;
     target.updatedAt = new Date().toISOString();
     appendActivity(local, {
       type: "order",
@@ -2587,6 +2624,7 @@ async function fetchStoreSettingsFromSource(): Promise<AdminSettingsRecord> {
             taxonomy: normalizeTaxonomy(parsed.taxonomy ?? local.settings.taxonomy, local.products),
             stories: normalizeStories(parsed.stories ?? local.settings.stories),
             facebookPixel: normalizeFacebookPixel(parsed.facebookPixel ?? local.settings.facebookPixel),
+            courier: normalizeCourier(parsed.courier ?? local.settings.courier),
           };
         }
       }
@@ -2623,6 +2661,7 @@ async function fetchStoreSettingsFromSource(): Promise<AdminSettingsRecord> {
     taxonomy: normalizeTaxonomy(local.settings.taxonomy, local.products),
     stories: normalizeStories(local.settings.stories),
     facebookPixel: normalizeFacebookPixel(local.settings.facebookPixel),
+    courier: normalizeCourier(local.settings.courier),
   };
 }
 
@@ -2734,6 +2773,9 @@ export async function updateStoreSettings(
     stories: normalizeStories(patch.stories ?? currentSettings.stories),
     facebookPixel: normalizeFacebookPixel(
       patch.facebookPixel !== undefined ? patch.facebookPixel : currentSettings.facebookPixel,
+    ),
+    courier: normalizeCourier(
+      patch.courier !== undefined ? patch.courier : currentSettings.courier,
     ),
   };
 

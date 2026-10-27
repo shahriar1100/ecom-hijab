@@ -55,6 +55,9 @@ export type Order = {
     | "Delivered"
     | "Returned"
     | "Cancelled";
+  courierProvider?: "steadfast" | "pathao" | "manual";
+  courierTrackingCode?: string;
+  courierConsignmentId?: string;
 };
 
 type OrdersState = { orders: readonly Order[]; ready: boolean; persistent: boolean };
